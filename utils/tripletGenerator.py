@@ -1,12 +1,15 @@
 import os
 import itertools
 
+import pandas as pd
+
 BASE_PATH = 'data\\KinFaceW\\'
 
 KinFaceWI = 'KinFaceW-I\\'
 KinFaceWII = 'KinFaceW-II\\'
 
 def load_pairs(dataset_path):
+    print(f'[log]: Loading triplets from {dataset_path}')
     pairs = []
     for root, _, files in os.walk(dataset_path):
         index = 0
@@ -18,6 +21,7 @@ def load_pairs(dataset_path):
     return pairs
 
 def generate_priplets(pairs):
+    print(f'[log]: generating triples...')
     triplets = []
 
     for first, second in itertools.product(pairs, pairs):
@@ -40,12 +44,15 @@ def generate_priplets(pairs):
 
     return triplets
 
+def generate_csv_file(dataset_path, csv_path):
+    print(f'[log]: generating csv file from {dataset_path}')
+    pairs = load_pairs(dataset_path)
+    triplets = generate_priplets(pairs)
 
-kinface_pairs_1 = load_pairs(BASE_PATH + KinFaceWI)
-kinface_pairs_2 = load_pairs(BASE_PATH + KinFaceWII)
+    df = pd.DataFrame.from_dict(triplets)
+    df.to_csv(csv_path, index=False)
+    print('[log]: Done')
 
-kinface_triplets_1 = generate_priplets(kinface_pairs_1)
-kinface_triplets_2 = generate_priplets(kinface_pairs_2)
-# print(len(kinface_triplets_1) + len(kinface_triplets_2))
-
-# print(kinface_triplets_1[125])
+if __name__ == '__main__':
+    generate_csv_file(BASE_PATH + KinFaceWI, 'KinFaecWITriplets.csv')
+    generate_csv_file(BASE_PATH + KinFaceWII, 'KinFaecWIITriplets.csv')
