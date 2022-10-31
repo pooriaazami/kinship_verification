@@ -30,15 +30,15 @@ def generate_priplets(pairs):
 
         triplets.append({
             'id': len(triplets),
-            'parent': first['root'] + first['parent'],
-            'child': first['root'] + first['child'],
+            'parent': first['root'] + '\\' + first['parent'],
+            'child': first['root'] + '\\' + first['child'],
             'negative_child': second['root'] + second['parent']
         })
 
         triplets.append({
             'id': len(triplets),
-            'parent': first['root'] + first['parent'],
-            'child': first['root'] + first['child'],
+            'parent': first['root'] + '\\' + first['parent'],
+            'child': first['root'] + '\\' +first['child'],
             'negative_child': second['root'] + second['child']
         })
 
