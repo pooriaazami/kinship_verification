@@ -37,16 +37,15 @@ def generate_priplets(pairs):
             'child': first['root'] + first['child'],
             'negative_child': second['root'] + second['child']
         })
-        # print(first['id'], second['id'])
 
-    print(f'total_count: {len(triplets)}')
-
+    return triplets
 
 
+kinface_pairs_1 = load_pairs(BASE_PATH + KinFaceWI)
+kinface_pairs_2 = load_pairs(BASE_PATH + KinFaceWII)
 
-KinFaceIPairs = load_pairs(BASE_PATH + KinFaceWI)
-KinFaceIIPairs = load_pairs(BASE_PATH + KinFaceWII)
+kinface_triplets_1 = generate_priplets(kinface_pairs_1)
+kinface_triplets_2 = generate_priplets(kinface_pairs_2)
+# print(len(kinface_triplets_1) + len(kinface_triplets_2))
 
-generate_priplets(KinFaceIPairs)
-generate_priplets(KinFaceIIPairs)
-# print(len(load_pairs(BASE_PATH + KinFaceWI)) + len(load_pairs(BASE_PATH + KinFaceWII)))
+# print(kinface_triplets_1[125])
