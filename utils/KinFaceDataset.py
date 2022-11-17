@@ -29,12 +29,15 @@ class KinFaecDataset(Dataset):
         positive_images = io.imread_collection(posotive_paths)
         negative_images = io.imread_collection(negative_paths)
 
-        if self.__transform:
-            anchor_images = self.__transform(anchor_images)
-            positive_images = self.__transform(positive_images)
-            negative_images = self.__transform(negative_images)
+        sample = {'anchor': anchor_images, 'pos': positive_images, 'neg': negative_images}
 
-        return {'anchor': anchor_images, 'pos': positive_images, 'neg': negative_images}
+        if self.__transform:
+            # anchor_images = self.__transform(anchor_images)
+            # positive_images = self.__transform(positive_images)
+            # negative_images = self.__transform(negative_images)
+            sample = self.__transform(sample)
+
+        return sample
 
 class ToTensor:
     def __call__(self, sample):
