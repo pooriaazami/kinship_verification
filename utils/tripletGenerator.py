@@ -32,7 +32,7 @@ def generate_priplets(pairs):
             'id': len(triplets),
             'parent': first['root'] + '\\' + first['parent'],
             'child': first['root'] + '\\' + first['child'],
-            'negative_child': second['root'] + second['parent']
+            'negative_child': second['root'] + '\\' + second['parent']
         })
 
         triplets.append({
@@ -54,5 +54,5 @@ def generate_csv_file(dataset_path, csv_path):
     print('[log]: Done')
 
 if __name__ == '__main__':
-    generate_csv_file(BASE_PATH + KinFaceWI, 'KinFaecWITriplets.csv')
-    generate_csv_file(BASE_PATH + KinFaceWII, 'KinFaecWIITriplets.csv')
+    generate_csv_file(BASE_PATH + KinFaceWI, 'KinFaceWITriplets.csv')
+    generate_csv_file(BASE_PATH + KinFaceWII, 'KinFaceWIITriplets.csv')

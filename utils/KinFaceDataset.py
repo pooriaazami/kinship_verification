@@ -50,7 +50,7 @@ class ToTensor:
         neg = neg.transpose((2, 0, 1))
 
         return {
-            'anchor': anchor,
+            'anchor': torch.from_numpy(anchor),
             'pos': torch.from_numpy(pos),
             'neg': torch.from_numpy(neg)
         }
