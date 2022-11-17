@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
@@ -45,9 +47,9 @@ class ToTensor:
     def __call__(self, sample):
         anchor, pos, neg = sample['anchor'], sample['pos'], sample['neg']
 
-        anchor = anchor.transpose((2, 0, 1))
-        pos = pos.transpose((2, 0, 1))
-        neg = neg.transpose((2, 0, 1))
+        anchor = anchor.transpose((2, 0, 1)).astype(np.float32)
+        pos = pos.transpose((2, 0, 1)).astype(np.float32)
+        neg = neg.transpose((2, 0, 1)).astype(np.float32)
 
         return {
             'anchor': torch.from_numpy(anchor),
