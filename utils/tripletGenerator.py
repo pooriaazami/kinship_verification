@@ -39,7 +39,7 @@ def generate_priplets(pairs):
             'id': len(triplets),
             'parent': first['root'] + '\\' + first['parent'],
             'child': first['root'] + '\\' +first['child'],
-            'negative_child': second['root'] + second['child']
+            'negative_child': second['root'] + '\\' +  second['child']
         })
 
     return triplets
