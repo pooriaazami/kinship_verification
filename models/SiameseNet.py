@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from BaseCNN import BaseCNN
-from Attention import AttentionLayer
+from models.BaseCNN import BaseCNN
+from models.Attention import AttentionLayer
 
 
 class SiameseNet(nn.Module):
