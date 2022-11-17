@@ -19,7 +19,6 @@ dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
 
 model = SiameseNet()
 
-anchor, pos, neg = next(iter(dataloader))
-print(anchor)
-print(pos)
-print(neg)
+data = next(iter(dataloader))
+anchor, pos, neg = data['anchor'], data['pos'], data['neg']
+print(anchor.shape)
