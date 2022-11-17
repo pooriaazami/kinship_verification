@@ -3,6 +3,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms, utils
 
+from tqdm import tqdm
+
 from utils.KinFaceDataset import KinFaecDataset, ToTensor
 from models.SiameseNet import SiameseNet
 
@@ -29,7 +31,7 @@ def train(dataset, model, loss_fn, optimizer, epochs=10):
     for epoch in range(1, epochs+1):
         
         total_loss = .0
-        for batch in dataset:
+        for batch in tqdm(dataset):
             optimizer.zero_grad()
 
             anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
