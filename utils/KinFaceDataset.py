@@ -27,6 +27,9 @@ class KinFaecDataset(Dataset):
         posotive_paths = items['child']
         negative_paths = items['negative_child']
         # print(items['parent'])
+        # print('[log]: start')
+        # print(anchor_paths, posotive_paths, negative_paths)
+        # print('[log]: end')
         anchor_images = io.imread(anchor_paths)
         positive_images = io.imread(posotive_paths)
         negative_images = io.imread(negative_paths)
