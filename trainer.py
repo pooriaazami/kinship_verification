@@ -43,21 +43,51 @@ def create_loss_function(model, alpha, l2_alpha):
         return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean()
     return triplet_loss
 
-
-def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, epochs=10, device='cpu'):
-    fig, ax = plt.subplots(1, 1)
+def training_step(train_dataset, model, optimizer, loss_fn, device):
+    total_loss_train = .0
+    anchor_pos_total_mean = .0
+    anchor_neg_total_mean = .0
     train_losses = []
-    validation_losses = []
+    # counter = 0
+    for batch in tqdm(train_dataset):
+        optimizer.zero_grad()
 
-    for epoch in range(1, epochs+1):
+        anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+
+        anchor = anchor.to(device)
+        pos = pos.to(device)
+        neg = neg.to(device)
+
+        anchor_embeddings = model(anchor)
+        pos_embeddings = model(pos)
+        neg_embeddings = model(neg)
+
+        loss, accurary, anchor_pos_mean, anchor_neg_mean = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
+        loss.backward()
+        optimizer.step()
+
+        loss_val = loss.item()
+        total_loss_train += loss_val
+        anchor_pos_total_mean += anchor_pos_mean
+        anchor_neg_total_mean += anchor_neg_mean
+
+        train_losses.append(total_loss_train)
         
-        total_loss_train = .0
+
+        total_loss_train /= len(train_dataset)
+        anchor_pos_mean /= len(train_dataset)
+        anchor_neg_mean /= len(train_dataset)
+
+    return total_loss_train, accurary, anchor_pos_mean, anchor_neg_mean, train_losses
+
+def validate_model(validation_dataset, model, optimizer, loss_fn, device):
+    with torch.no_grad():
+        total_loss_validation = .0
         anchor_pos_total_mean = .0
         anchor_neg_total_mean = .0
-        # counter = 0
-        for batch in tqdm(train_dataset):
-            optimizer.zero_grad()
+        validation_losses = []
 
+        for batch in tqdm(validation_dataset):
             anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
 
             anchor = anchor.to(device)
@@ -68,55 +98,36 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, ep
             pos_embeddings = model(pos)
             neg_embeddings = model(neg)
 
-            loss, acuurary, anchor_pos_mean, anchor_neg_mean = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
-            loss.backward()
-            optimizer.step()
-
-            loss_val = loss.item()
-            total_loss_train += loss_val
+            loss, accuracy, anchor_pos_mean, anchor_neg_mean = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
+            total_loss_validation += loss.item()
             anchor_pos_total_mean += anchor_pos_mean
             anchor_neg_total_mean += anchor_neg_mean
-
-            train_losses.append(total_loss_train)
-        
-
-        total_loss_train /= len(train_dataset)
-        anchor_pos_mean /= len(train_dataset)
-        anchor_neg_mean /= len(train_dataset)
-
-        print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {acuurary.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,n).mean(): {anchor_neg_total_mean}')
-
-        with torch.no_grad():
-            total_loss_validation = .0
-            anchor_pos_total_mean = .0
-            anchor_neg_total_mean = .0
-
-            for batch in tqdm(validation_dataset):
-                anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
-
-                anchor = anchor.to(device)
-                pos = pos.to(device)
-                neg = neg.to(device)
-
-                anchor_embeddings = model(anchor)
-                pos_embeddings = model(pos)
-                neg_embeddings = model(neg)
-
-                loss, accuracy, anchor_pos_mean, anchor_neg_mean = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
-                total_loss_validation += loss.item()
-                anchor_pos_total_mean += anchor_pos_mean
-                anchor_neg_total_mean += anchor_neg_mean
-                validation_losses.append(total_loss_validation)
+            validation_losses.append(total_loss_validation)
 
         total_loss_validation /= len(validation_dataset)
         anchor_pos_mean /= len(validation_dataset)
         anchor_neg_mean /= len(validation_dataset)
-        
+
+        return total_loss_validation, accuracy, anchor_pos_mean, anchor_neg_mean, validation_losses
+
+
+
+def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, epochs=10, device='cpu'):
+    fig, ax = plt.subplots(1, 1)
+    train_losses = []
+    validation_losses = []
+
+    for epoch in range(1, epochs+1):
+        total_loss_train, accuracy, anchor_pos_total_mean, anchor_neg_total_mean, train_losses_for_epoch = training_step(train_dataset, model, optimizer, loss_fn, device)
+        print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {accuracy.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,n).mean(): {anchor_neg_total_mean}')
+
+        total_loss_validation, accuracy, anchor_pos_total_mean, anchor_neg_toal_mean, validation_losses_for_epoch = validate_model(validation_dataset, model, optimizer, loss_fn, device)
         print(f'validation loss: {total_loss_validation} accuracy: {accuracy * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,n).mean(): {anchor_neg_total_mean}')
+
+        train_losses.extend(train_losses_for_epoch)
+        validation_losses.extend(validation_losses_for_epoch)
             
         torch.save(model.state_dict(), f'model_{epoch}.pth')
-        # if epoch % 10 == 0:
-        #     print(f'#Epoch {epoch} loss: {loss_val}')
         
 
     return train_losses, validation_losses
@@ -182,7 +193,7 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validati
 def main():
     print('Initializing variables...')
     
-    train_dataloader, validation_dataloader, test_dataloader = load_dataset()#data_portion=2000, val_portion=100)
+    train_dataloader, validation_dataloader, test_dataloader = load_dataset(data_portion=2000, val_portion=100)
     model = PretrainedSiameseNet(device='cuda').to('cuda')
     criterion = create_loss_function(model, .1, 0.01)
     optimizer = optim.Adam(model.parameters())
