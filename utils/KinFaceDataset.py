@@ -9,7 +9,7 @@ from skimage import io, transform
 import pandas as pd
 
 
-class KinFaecDataset(Dataset):
+class KinFaceDataset(Dataset):
     def __init__(self, csv_path, transform=None):
         self.__triplets = pd.read_csv(csv_path)
         # print(self.__triplets.head())

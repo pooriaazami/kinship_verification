@@ -5,7 +5,7 @@ from torchvision import transforms, utils
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from utils.KinFaceDataset import KinFaecDataset, ToTensor
+from utils.KinFaceDataset import KinFaceDataset, ToTensor
 
 TrainKINFaceWI = 'data\\TrainKinFaceWITriplets.csv'
 TrainKINFaceWII = 'data\\TrainKinFaceWIITriplets.csv'
@@ -134,39 +134,22 @@ def split_dataset(dataset):
 
     return train, validation
 
+def initiate_dataset(csv_path_1, csv_path_2):
+    kinfacei = KinFaceDataset(csv_path=csv_path_1, transform=transforms.Compose([
+        ToTensor()
+    ]))
+
+    kinfaceii = KinFaceDataset(csv_path=csv_path_2, transform=transforms.Compose([
+        ToTensor()
+    ]))
+
+    concatenated_dataset = torch.utils.data.ConcatDataset([kinfacei, kinfaceii])
+    return concatenated_dataset
+
 def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validation_batch_size=256, test_batch_size=256): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
-    # Train
-    train_dataset_kinfacewi = KinFaecDataset(csv_path=TrainKINFaceWI, transform=transforms.Compose([
-        ToTensor()
-    ]))
-
-    train_dataset_kinfacewii = KinFaecDataset(csv_path=TrainKINFaceWII, transform=transforms.Compose([
-        ToTensor()
-    ]))
-
-    train_concatinated_data = torch.utils.data.ConcatDataset([train_dataset_kinfacewi, train_dataset_kinfacewii])
-
-    # Validation
-    Validation_dataset_kinfacewi = KinFaecDataset(csv_path=ValidationKINFaceWI, transform=transforms.Compose([
-        ToTensor()
-    ]))
-
-    Validation_dataset_kinfacewii = KinFaecDataset(csv_path=ValidationKINFaceWII, transform=transforms.Compose([
-        ToTensor()
-    ]))
-
-    validation_concatinated_data = torch.utils.data.ConcatDataset([Validation_dataset_kinfacewi, Validation_dataset_kinfacewii])
-
-    # Test
-    test_dataset_kinfacewi = KinFaecDataset(csv_path=TestKINFaceWI, transform=transforms.Compose([
-        ToTensor()
-    ]))
-
-    test_dataset_kinfacewii = KinFaecDataset(csv_path=TestKINFaceWII, transform=transforms.Compose([
-        ToTensor()
-    ]))
-
-    test_concatinated_data = torch.utils.data.ConcatDataset([test_dataset_kinfacewi, test_dataset_kinfacewii])
+    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII)
+    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII)
+    test_concatinated_data = initiate_dataset(TestKINFaceWI, TestKINFaceWII)
 
     if data_portion != -1:
         idx = torch.randperm(len(train_concatinated_data))[:data_portion]
@@ -175,8 +158,6 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validati
     if val_portion != -1:
         idx = torch.randperm(len(validation_concatinated_data))[:val_portion]
         validation_concatinated_data = torch.utils.data.Subset(validation_concatinated_data, idx)
-
-    # train, validation = split_dataset(concatinated_data, validation_split)
 
     train_dataloader = DataLoader(train_concatinated_data, batch_size=train_batch_size, shuffle=True, num_workers=4, prefetch_factor=2)
     validation_dataloader = DataLoader(validation_concatinated_data, batch_size=validation_batch_size, shuffle=True, num_workers=4, prefetch_factor=2)
