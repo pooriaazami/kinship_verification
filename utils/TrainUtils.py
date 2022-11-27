@@ -5,6 +5,9 @@ from torchvision import transforms, utils
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+import logging
+import time
+
 from utils.KinFaceDataset import KinFaceDataset, ToTensor
 
 TrainKINFaceWI = 'data\\TrainKinFaceWITriplets.csv'
@@ -15,6 +18,8 @@ ValidationKINFaceWII = 'data\\ValidationKinFaceWIITriplets.csv'
 
 TestKINFaceWI = 'data\\TestKinFaceWITriplets.csv'
 TestKINFaceWII = 'data\\TestKinFaceWIITriplets.csv'
+
+# logging.basicConfig(filename=f'{int(time.time() * 1000)}.log', level=logging.DEBUG)
 
 def create_loss_function(model, alpha, l2_alpha):
     def triplet_loss(anchor, pos, neg):
@@ -106,7 +111,6 @@ def validate_model(validation_dataset, model, optimizer, loss_fn, device):
         return total_loss_validation, accuracy, anchor_pos_mean, anchor_neg_mean, validation_losses
 
 
-
 def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, epochs=10, device='cpu'):
     fig, ax = plt.subplots(1, 1)
     train_losses = []
@@ -127,14 +131,13 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, ep
 
     return train_losses, validation_losses
 
-
 def split_dataset(dataset):
     validation_count = int(len(dataset) * validation_split_rate)
     train, validation = torch.utils.data.random_split(dataset, [len(dataset) - validation_count, validation_count])
 
     return train, validation
 
-def initiate_dataset(csv_path_1, csv_path_2):
+def initiate_dataset(csv_path_1, csv_path_2, dataset_code):
     kinfacei = KinFaceDataset(csv_path=csv_path_1, transform=transforms.Compose([
         ToTensor()
     ]))
@@ -144,12 +147,18 @@ def initiate_dataset(csv_path_1, csv_path_2):
     ]))
 
     concatenated_dataset = torch.utils.data.ConcatDataset([kinfacei, kinfaceii])
-    return concatenated_dataset
 
-def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validation_batch_size=256, test_batch_size=256): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
-    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII)
-    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII)
-    test_concatinated_data = initiate_dataset(TestKINFaceWI, TestKINFaceWII)
+    if dataset_code == 'kfi':
+        return kinfacei
+    elif dataset_code == 'kfii':
+        return kinfaceii
+    else:
+        return concatenated_dataset
+
+def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validation_batch_size=256, test_batch_size=256, dataset_code='mix'): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
+    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII, dataset_code)
+    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII, dataset_code)
+    test_concatinated_data = initiate_dataset(TestKINFaceWI, TestKINFaceWII, dataset_code)
 
     if data_portion != -1:
         idx = torch.randperm(len(train_concatinated_data))[:data_portion]
@@ -159,9 +168,9 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validati
         idx = torch.randperm(len(validation_concatinated_data))[:val_portion]
         validation_concatinated_data = torch.utils.data.Subset(validation_concatinated_data, idx)
 
-    train_dataloader = DataLoader(train_concatinated_data, batch_size=train_batch_size, shuffle=True, num_workers=4, prefetch_factor=2)
-    validation_dataloader = DataLoader(validation_concatinated_data, batch_size=validation_batch_size, shuffle=True, num_workers=4, prefetch_factor=2)
-    test_dataloader = DataLoader(test_concatinated_data, batch_size=test_batch_size, shuffle=True, num_workers=4, prefetch_factor=2)
+    train_dataloader = DataLoader(train_concatinated_data, batch_size=train_batch_size, shuffle=True, num_workers=2, prefetch_factor=2)
+    validation_dataloader = DataLoader(validation_concatinated_data, batch_size=validation_batch_size, shuffle=True, num_workers=2, prefetch_factor=2)
+    test_dataloader = DataLoader(test_concatinated_data, batch_size=test_batch_size, shuffle=True, num_workers=2, prefetch_factor=2)
 
     # print(len(train_dataloader), len(validation_dataloader), len(test_dataloader))
     return train_dataloader, validation_dataloader, test_dataloader
