@@ -59,3 +59,24 @@ class ToTensor:
             'pos': torch.from_numpy(pos),
             'neg': torch.from_numpy(neg)
         }
+
+class Normalize:
+    def __init__(self, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], device='cpu'):
+        # self.mean = torch.Tensor(mean, device=device)
+        # self.std = torch.Tensor(std, device=device)
+        self.transform = transforms.Normalize(mean, std)
+
+    def __call__(self, sample):
+        anchor, pos, neg = sample['anchor'], sample['pos'], sample['neg']
+
+        anchor = self.transform(anchor) #(anchor - self.mean) / self.std
+        pos = self.transform(pos) #(pos - self.mean) / self.std
+        neg = self.transform(neg) #(neg - self.mean) / self.std
+
+        return {
+            'anchor': anchor,
+            'pos': pos,
+            'neg': neg
+        }
+
+

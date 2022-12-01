@@ -8,7 +8,7 @@ from tqdm import tqdm
 import logging
 import time
 
-from utils.KinFaceDataset import KinFaceDataset, ToTensor
+from utils.KinFaceDataset import KinFaceDataset, ToTensor, Normalize
 
 TrainKINFaceWI = 'data\\TrainKinFaceWITriplets.csv'
 TrainKINFaceWII = 'data\\TrainKinFaceWIITriplets.csv'
@@ -139,11 +139,13 @@ def split_dataset(dataset):
 
 def initiate_dataset(csv_path_1, csv_path_2, dataset_code):
     kinfacei = KinFaceDataset(csv_path=csv_path_1, transform=transforms.Compose([
-        ToTensor()
+        ToTensor(),
+        Normalize()
     ]))
 
     kinfaceii = KinFaceDataset(csv_path=csv_path_2, transform=transforms.Compose([
-        ToTensor()
+        ToTensor(),
+        Normalize()
     ]))
 
     concatenated_dataset = torch.utils.data.ConcatDataset([kinfacei, kinfaceii])
