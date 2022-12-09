@@ -8,11 +8,11 @@ from models.VGGFace import VGGFace
 
 
 class SiameseNet(nn.Module):
-    def __init__(self):
+    def __init__(self, embedding_size=128):
         super().__init__()
 
         self.attention_layer = AttentionLayer(3)
-        self.base_cnn = BaseCNN()
+        self.base_cnn = BaseCNN(embedding_size)
 
     def forward(self, x):
         x = self.attention_layer(x)
@@ -21,7 +21,7 @@ class SiameseNet(nn.Module):
         return x
 
 class PretrainedSiameseNet(nn.Module):
-    def __init__(self, embedding_size=128, device='cpu'):
+    def __init__(self, embedding_size=64, device='cpu'):
         super().__init__()
         self.device = device
 

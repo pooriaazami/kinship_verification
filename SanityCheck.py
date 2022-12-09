@@ -4,7 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from utils.TrainUtils import create_loss_function, train_model, load_dataset
-from models.SiameseNet import BaseCNN
+from models.SiameseNet import SiameseNet, PretrainedSiameseNet
 from models.BinaryModel import Classifier
 
 from sklearn.metrics import accuracy_score
@@ -64,9 +64,8 @@ def train(train_dataloader, validation_dataloader, model, loss_fn, optimizer, de
             loss.backward()
             optimizer.step()
 
-
+        total_val_accuracy = .0
         with torch.no_grad():
-            total_val_accuracy = .0
             for batch in tqdm(validation_dataloader):
                 anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
 
@@ -90,7 +89,8 @@ def main():
     
     train_dataloader, validation_dataloader, test_dataloader = load_dataset(dataset_code='kfii')#, data_portion=2000, val_portion=100)
     # model = PretrainedSiameseNet(device='cuda').to('cuda')
-    base_model = BaseCNN()
+    # base_model = SiameseNet(64)
+    base_model = PretrainedSiameseNet(device='cuda')
     classifier = Classifier(base_model, 64).to('cuda')
 
     base_loss_fn = nn.BCEWithLogitsLoss()
@@ -98,7 +98,7 @@ def main():
 
     criterion = generate_loss(base_loss_fn)
     # val_criterion = generate_loss(base_val_fn)
-    optimizer = optim.Adam(classifier.parameters(), lr=0.0001, weight_decay=1e-3)
+    optimizer = optim.Adam(classifier.parameters(), lr=0.001, weight_decay=5e-2)
     # print(list(classifier.parameters()))
     print('Done')
     train(train_dataloader, validation_dataloader, classifier, criterion, optimizer, device='cuda', epochs=50)
