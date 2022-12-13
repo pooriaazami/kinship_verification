@@ -8,13 +8,13 @@ from models.SiameseNet import PretrainedSiameseNet
 def main():
     print('Initializing variables...')
     
-    train_dataloader, validation_dataloader, test_dataloader = load_dataset(data_portion=2000, val_portion=100)
-    model = PretrainedSiameseNet(device='cuda').to('cuda')
-    criterion = create_loss_function(model, .1, 0.01)
-    optimizer = optim.Adam(model.parameters(), le=0.001, weight_decat=0.01)
+    train_dataloader, validation_dataloader, test_dataloader = load_dataset(dataset_code='kfii')#, data_portion=100, val_portion=50)
+    model = PretrainedSiameseNet(device='cuda', use_attention=False).to('cuda')
+    criterion = create_loss_function(model, 1., 0.01)
+    optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01)
 
     print('Done')
-    train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=50)
+    train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=500)
 
 
 if __name__ == '__main__':

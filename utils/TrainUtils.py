@@ -22,28 +22,28 @@ TestKINFaceWII = 'data\\TestKinFaceWIITriplets.csv'
 # logging.basicConfig(filename=f'{int(time.time() * 1000)}.log', level=logging.DEBUG)
 
 def create_loss_function(model, alpha, l2_alpha):
+    sim = torch.nn.CosineSimilarity()
     def triplet_loss(anchor, pos, neg):
         count, _ = anchor.shape
-        anchor_pos_diff = torch.pow(torch.norm(anchor - pos, dim=1), 2)
-        anchor_neg_diff = torch.pow(torch.norm(anchor - neg, dim=1), 2)
-        # print(anchor_neg_diff)
+
+        anchor_pos_diff = 1- sim(anchor, pos)
+        anchor_neg_diff = 1- sim(anchor, neg)
+        
         loss_val = anchor_pos_diff - anchor_neg_diff + alpha
         loss_val = torch.fmax(loss_val, torch.zeros_like(loss_val))
         loss_val = torch.sum(loss_val)
 
-        fc1_params = torch.cat([x.view(-1) for x in model.fc1.parameters()])
-        fc2_params = torch.cat([x.view(-1) for x in model.fc2.parameters()])
-
-        loss_val += l2_alpha * torch.norm(fc1_params, 2) + l2_alpha * torch.norm(fc2_params, 2)
-
-        pos_count = torch.sum(anchor_pos_diff >= alpha)
-        neg_count = torch.sum(anchor_neg_diff < alpha)
-        accuracy = (pos_count + neg_count) / (count * 2)
+        with torch.no_grad():
+            threshold = anchor_pos_diff.mean()
+            pos_count = torch.sum(anchor_pos_diff <= threshold)
+            neg_count = torch.sum(anchor_neg_diff > threshold)
+            accuracy = (pos_count + neg_count) / (count * 2)
         
         return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean()
     return triplet_loss
 
 def training_step(train_dataset, model, optimizer, loss_fn, device):
+    model.train()
     total_loss_train = .0
     anchor_pos_total_mean = .0
     anchor_neg_total_mean = .0
@@ -81,6 +81,7 @@ def training_step(train_dataset, model, optimizer, loss_fn, device):
     return total_loss_train, accurary, anchor_pos_mean, anchor_neg_mean, train_losses
 
 def validate_model(validation_dataset, model, optimizer, loss_fn, device):
+    model.eval()
     with torch.no_grad():
         total_loss_validation = .0
         anchor_pos_total_mean = .0
@@ -126,7 +127,7 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, ep
         train_losses.extend(train_losses_for_epoch)
         validation_losses.extend(validation_losses_for_epoch)
             
-        torch.save(model.state_dict(), f'model_{epoch}.pth')
+        # torch.save(model.state_dict(), f'model_{epoch}.pth')
         
 
     return train_losses, validation_losses
