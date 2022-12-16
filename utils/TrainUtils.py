@@ -26,8 +26,8 @@ def create_loss_function(model, alpha, l2_alpha):
     def triplet_loss(anchor, pos, neg):
         count, _ = anchor.shape
 
-        anchor_pos_diff = 1- sim(anchor, pos)
-        anchor_neg_diff = 1- sim(anchor, neg)
+        anchor_pos_diff = 1 - sim(anchor, pos)
+        anchor_neg_diff = 1 - sim(anchor, neg)
         
         loss_val = anchor_pos_diff - anchor_neg_diff + alpha
         loss_val = torch.fmax(loss_val, torch.zeros_like(loss_val))
@@ -39,14 +39,54 @@ def create_loss_function(model, alpha, l2_alpha):
             neg_count = torch.sum(anchor_neg_diff > threshold)
             accuracy = (pos_count + neg_count) / (count * 2)
         
-        return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean()
+        return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean(), anchor_pos_diff.std(), anchor_neg_diff.std()
     return triplet_loss
+
+def create_mixed_loss(model, alpha):
+    sim = torch.nn.CosineSimilarity()
+    def triplet_loss(true_anchor, true_pos, true_neg, false_anchor, false_pos):
+        count, _ = true_anchor.shape
+
+        tanchor_tpos_diff = 1 - sim(true_anchor, true_pos)
+        tanchor_tneg_diff = 1 - sim(true_anchor, true_neg)
+        fanchor_fpos_diff = 1 - sim(false_anchor, false_pos)
+
+        first_term = tanchor_tpos_diff - tanchor_tneg_diff + alpha
+        first_term = torch.fmax(first_term, torch.zeros_like(first_term))
+        first_term = torch.sum(first_term)
+
+        second_term = tanchor_tpos_diff - fanchor_fpos_diff + alpha
+        second_term = torch.fmax(second_term, torch.zeros_like(second_term))
+        second_term = torch.sum(second_term)
+
+        loss_val = first_term + .9 * second_term
+
+        with torch.no_grad():
+            threshold = tanchor_tpos_diff.mean()
+            tpos_count = torch.sum(tanchor_tpos_diff <= threshold)
+            tneg_count = torch.sum(tanchor_tneg_diff > threshold)
+            fpos_count = torch.sum(fanchor_fpos_diff > threshold)
+
+            accuracy = (tpos_count + tneg_count) / (count * 2)
+
+        ap_mean = tanchor_tpos_diff.mean()
+        ap_std =  tanchor_tpos_diff.std()
+        np_mean = (fanchor_fpos_diff + tanchor_tneg_diff).mean()
+        np_std = (fanchor_fpos_diff + tanchor_tneg_diff).std()
+
+        return loss_val, accuracy, ap_mean, np_mean, ap_std, np_std
+    return triplet_loss
+
 
 def training_step(train_dataset, model, optimizer, loss_fn, device):
     model.train()
     total_loss_train = .0
+    total_loss_validation = .0
     anchor_pos_total_mean = .0
     anchor_neg_total_mean = .0
+    anchor_pos_total_std = .0
+    anchor_neg_total_std = .0
+    total_accuracy = .0
     train_losses = []
     # counter = 0
     for batch in tqdm(train_dataset):
@@ -62,7 +102,7 @@ def training_step(train_dataset, model, optimizer, loss_fn, device):
         pos_embeddings = model(pos)
         neg_embeddings = model(neg)
 
-        loss, accurary, anchor_pos_mean, anchor_neg_mean = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
+        loss, accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
         loss.backward()
         optimizer.step()
 
@@ -70,15 +110,126 @@ def training_step(train_dataset, model, optimizer, loss_fn, device):
         total_loss_train += loss_val
         anchor_pos_total_mean += anchor_pos_mean
         anchor_neg_total_mean += anchor_neg_mean
+        total_accuracy += accuracy
 
         train_losses.append(total_loss_train)
         
 
-        total_loss_train /= len(train_dataset)
-        anchor_pos_mean /= len(train_dataset)
-        anchor_neg_mean /= len(train_dataset)
+    total_loss_train /= len(train_dataset)
+    anchor_pos_mean /= len(train_dataset)
+    anchor_neg_mean /= len(train_dataset)
+    anchor_pos_std /= len(train_dataset)
+    anchor_neg_std /= len(train_dataset)
+    total_accuracy /= len(train_dataset)
 
-    return total_loss_train, accurary, anchor_pos_mean, anchor_neg_mean, train_losses
+    return total_loss_train, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, train_losses
+
+def augmented_training_step(train_dataset, model, optimizer, loss_fn, device):
+    model.train()
+    total_loss_train = .0
+    total_loss_validation = .0
+    anchor_pos_total_mean = .0
+    anchor_neg_total_mean = .0
+    anchor_pos_total_std = .0
+    anchor_neg_total_std = .0
+    total_accuracy = .0
+    train_losses = []
+    # counter = 0
+    for batch in tqdm(train_dataset):
+        optimizer.zero_grad()
+
+        anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+        batch, channel, width, height = anchor.shape
+
+        pos_anchor = torch.cat([torch.ones((batch, 1, width, height), device=anchor.device), anchor], dim=1) 
+        pos_pos = torch.cat([torch.zeros((batch, 1, width, height), device=pos.device), pos], dim=1)
+        pos_neg = torch.cat([torch.zeros((batch, 1, width, height), device=neg.device), neg], dim=1)
+        neg_anchor = torch.cat([torch.ones((batch, 1, width, height), device=pos.device), pos], dim=1) 
+        neg_neg = torch.cat([torch.zeros((batch, 1, width, height), device=anchor.device), anchor], dim=1)
+        # print(pos_anchor.shape) 
+
+        pos_anchor = pos_anchor.to(device)
+        pos_pos = pos_pos.to(device)
+        pos_neg = pos_neg.to(device)
+        neg_anchor = neg_anchor.to(device)
+        neg_neg = neg_neg.to(device)
+
+
+        pos_anchor_embeddings = model(pos_anchor)
+        pos_pos_embeddings = model(pos_pos)
+        pos_neg_embeddings = model(pos_neg)
+        neg_anchor_embeddings = model(neg_anchor)
+        neg_neg_embedding = model(neg_neg)
+
+        loss, accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std = loss_fn(pos_anchor_embeddings, pos_pos_embeddings, pos_neg_embeddings, neg_anchor_embeddings, neg_neg_embedding)
+        loss.backward()
+        optimizer.step()
+
+        loss_val = loss.item()
+        total_loss_train += loss_val
+        anchor_pos_total_mean += anchor_pos_mean
+        anchor_neg_total_mean += anchor_neg_mean
+        total_accuracy += accuracy
+
+        train_losses.append(total_loss_train)
+        
+
+    total_loss_train /= len(train_dataset)
+    anchor_pos_mean /= len(train_dataset)
+    anchor_neg_mean /= len(train_dataset)
+    anchor_pos_std /= len(train_dataset)
+    anchor_neg_std /= len(train_dataset)
+    total_accuracy /= len(train_dataset)
+
+    return total_loss_train, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, train_losses
+
+def validate_augmented_model(validation_dataset, model, optimizer, loss_fn, device):
+    model.eval()
+    with torch.no_grad():
+        total_loss_validation = .0
+        anchor_pos_total_mean = .0
+        anchor_neg_total_mean = .0
+        anchor_pos_total_std = .0
+        anchor_neg_total_std = .0
+        total_accuracy = .0
+
+        validation_losses = []
+
+        for batch in tqdm(validation_dataset):
+            anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+
+            anchor = anchor.to(device)
+            pos = pos.to(device)
+            neg = neg.to(device)
+
+            batch, channel, width, height = anchor.shape
+            anchor = torch.cat([torch.ones((batch, 1, width, height), device=anchor.device), anchor], dim=1)
+            pos = torch.cat([torch.zeros((batch, 1, width, height), device=pos.device), pos], dim=1)
+            neg = torch.cat([torch.zeros((batch, 1, width, height), device=neg.device), neg], dim=1)
+
+            anchor_embeddings = model(anchor)
+            pos_embeddings = model(pos)
+            neg_embeddings = model(neg)
+
+            loss, accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings, anchor_embeddings, pos_embeddings)
+            total_loss_validation += loss.item()
+            anchor_pos_total_mean += anchor_pos_mean
+            anchor_neg_total_mean += anchor_neg_mean
+            anchor_pos_total_std += anchor_pos_std
+            anchor_neg_total_std += anchor_neg_std
+            total_accuracy += accuracy
+
+            validation_losses.append(total_loss_validation)
+
+        total_loss_validation /= len(validation_dataset)
+        anchor_pos_mean /= len(validation_dataset)
+        anchor_neg_mean /= len(validation_dataset)
+        anchor_pos_std /= len(validation_dataset)
+        anchor_neg_std /= len(validation_dataset)
+        total_accuracy /= len(validation_dataset)
+
+        return total_loss_validation, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, validation_losses
+
 
 def validate_model(validation_dataset, model, optimizer, loss_fn, device):
     model.eval()
@@ -86,6 +237,10 @@ def validate_model(validation_dataset, model, optimizer, loss_fn, device):
         total_loss_validation = .0
         anchor_pos_total_mean = .0
         anchor_neg_total_mean = .0
+        anchor_pos_total_std = .0
+        anchor_neg_total_std = .0
+        total_accuracy = .0
+
         validation_losses = []
 
         for batch in tqdm(validation_dataset):
@@ -99,30 +254,37 @@ def validate_model(validation_dataset, model, optimizer, loss_fn, device):
             pos_embeddings = model(pos)
             neg_embeddings = model(neg)
 
-            loss, accuracy, anchor_pos_mean, anchor_neg_mean = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
+            loss, accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std = loss_fn(anchor_embeddings, pos_embeddings, neg_embeddings)
             total_loss_validation += loss.item()
             anchor_pos_total_mean += anchor_pos_mean
             anchor_neg_total_mean += anchor_neg_mean
+            anchor_pos_total_std += anchor_pos_std
+            anchor_neg_total_std += anchor_neg_std
+            total_accuracy += accuracy
+
             validation_losses.append(total_loss_validation)
 
         total_loss_validation /= len(validation_dataset)
         anchor_pos_mean /= len(validation_dataset)
         anchor_neg_mean /= len(validation_dataset)
+        anchor_pos_std /= len(validation_dataset)
+        anchor_neg_std /= len(validation_dataset)
+        total_accuracy /= len(validation_dataset)
 
-        return total_loss_validation, accuracy, anchor_pos_mean, anchor_neg_mean, validation_losses
+        return total_loss_validation, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, validation_losses
 
 
-def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, epochs=10, device='cpu'):
+def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, training_step=training_step, validation_step=validate_model, epochs=10, device='cpu'):
     fig, ax = plt.subplots(1, 1)
     train_losses = []
     validation_losses = []
 
     for epoch in range(1, epochs+1):
-        total_loss_train, accuracy, anchor_pos_total_mean, anchor_neg_total_mean, train_losses_for_epoch = training_step(train_dataset, model, optimizer, loss_fn, device)
-        print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {accuracy.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,n).mean(): {anchor_neg_total_mean}')
+        total_loss_train, accuracy, anchor_pos_total_mean, anchor_neg_total_mean, anchor_pos_total_std, anchor_neg_total_std, train_losses_for_epoch = training_step(train_dataset, model, optimizer, loss_fn, device)
+        print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {accuracy.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
 
-        total_loss_validation, accuracy, anchor_pos_total_mean, anchor_neg_toal_mean, validation_losses_for_epoch = validate_model(validation_dataset, model, optimizer, loss_fn, device)
-        print(f'validation loss: {total_loss_validation} accuracy: {accuracy * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,n).mean(): {anchor_neg_total_mean}')
+        total_loss_validation, accuracy, anchor_pos_total_mean, anchor_neg_toal_mean, anchor_pos_total_std, anchor_neg_total_std, validation_losses_for_epoch = validation_step(validation_dataset, model, optimizer, loss_fn, device)
+        print(f'validation loss: {total_loss_validation} accuracy: {accuracy * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
 
         train_losses.extend(train_losses_for_epoch)
         validation_losses.extend(validation_losses_for_epoch)
