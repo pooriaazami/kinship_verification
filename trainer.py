@@ -8,7 +8,7 @@ from models.SiameseNet import PretrainedSiameseNet, SiameseNet
 def main():
     print('Initializing variables...')
     
-    train_dataloader, validation_dataloader, test_dataloader = load_dataset(dataset_code='kfii', data_portion=100, val_portion=50)
+    train_dataloader, validation_dataloader, test_dataloader = load_dataset(dataset_code='kfii')#, data_portion=100, val_portion=50)
     model = SiameseNet(device='cuda', use_attention=True, in_channels=4).to('cuda')
     # criterion = create_loss_function(model, 1., 0.01)
     criterion = create_mixed_loss(model, 1.)

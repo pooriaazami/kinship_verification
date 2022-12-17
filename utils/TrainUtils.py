@@ -8,6 +8,8 @@ from tqdm import tqdm
 import logging
 import time
 
+# import pandas as pd
+
 from utils.KinFaceDataset import KinFaceDataset, ToTensor, Normalize
 
 TrainKINFaceWI = 'data\\TrainKinFaceWITriplets.csv'
@@ -53,13 +55,14 @@ def create_mixed_loss(model, alpha):
 
         first_term = tanchor_tpos_diff - tanchor_tneg_diff + alpha
         first_term = torch.fmax(first_term, torch.zeros_like(first_term))
+        # temp = first_term.cpu()
         first_term = torch.sum(first_term)
 
         second_term = tanchor_tpos_diff - fanchor_fpos_diff + alpha
         second_term = torch.fmax(second_term, torch.zeros_like(second_term))
         second_term = torch.sum(second_term)
 
-        loss_val = first_term + .9 * second_term
+        loss_val = first_term + second_term
 
         with torch.no_grad():
             threshold = tanchor_tpos_diff.mean()
@@ -68,6 +71,9 @@ def create_mixed_loss(model, alpha):
             fpos_count = torch.sum(fanchor_fpos_diff > threshold)
 
             accuracy = (tpos_count + tneg_count) / (count * 2)
+
+            # df = pd.DataFrame(temp.numpy())
+            # df.to_csv(f'logs\\{time.time() * 1000}.csv')
 
         ap_mean = tanchor_tpos_diff.mean()
         ap_std =  tanchor_tpos_diff.std()

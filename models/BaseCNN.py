@@ -26,7 +26,7 @@ class BaseCNN(nn.Module):
         # self.fc1 = nn.Linear(8192, self.embedding_size)
         self.fc1 = nn.Linear(8192, self.embedding_size)
         self.fc2 = nn.Linear(self.embedding_size, self.embedding_size)
-        self.dropout = nn.Dropout(.5)
+        self.dropout = nn.Dropout(.2)
 
     def forward(self, x):
         x = F.relu(self.conv1_1(x))

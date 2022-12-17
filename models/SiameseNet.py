@@ -19,10 +19,13 @@ class SiameseNet(nn.Module):
         self.base_cnn = BaseCNN(embedding_size=embedding_size, in_channels=in_channels)
 
         if self.use_attention:
-            self.mask = torch.zeros((64, 64), requires_grad=False, dtype=torch.float32).to(self.device)
+            self.mask = torch.zeros((64, 64), dtype=torch.float32).to(self.device)
             self.mask[0:20, :] = 1
             self.mask[10:50, 20:40] = 1
             self.mask[50:, :] = 1
+
+            self.mask = nn.Parameter(self.mask)
+            self.mask.requires_grad = False
 
     def forward(self, x):
         if self.use_attention:
