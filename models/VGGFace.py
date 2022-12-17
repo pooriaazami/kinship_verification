@@ -18,7 +18,7 @@ class VGGFace(nn.Module):
     Main Class
     """
 
-    def __init__(self, trainable=True):
+    def __init__(self, trainable=True, freeze=True):
         """
         Constructor
         """
@@ -38,9 +38,10 @@ class VGGFace(nn.Module):
         self.conv_5_2 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
         self.conv_5_3 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
 
-        if not trainable:
-            for param in self.parameters():
-                param.requires_grad = False
+        if freeze:
+            if not trainable:
+                for param in self.parameters():
+                    param.requires_grad = False
 
     def forward(self, x):
         """ Pytorch forward
