@@ -5,3 +5,4 @@ data/
 logs/
 saved_models/
 *.pth
+.ipynb_checkpoints
