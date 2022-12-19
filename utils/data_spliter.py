@@ -9,6 +9,21 @@ BASE_PATH = 'data\\KinFaceW\\'
 KinFaceWI = 'KinFaceW-I\\'
 KinFaceWII = 'KinFaceW-II\\'
 
+def read_folds(folds_path, folds):
+    images = []
+
+    with open(folds_path) as file:
+        for index, line in enumerate(file):
+            if index + 1 not in folds:
+                continue
+
+            line = line.strip()
+            for item in line.split(' '):
+                images.append(item)
+
+    return images
+        
+
 def get_images(source):
     pairs = {}
     count = 0
@@ -37,7 +52,7 @@ def load_pairs(dataset_path, validation_split, test_split):
     for root, _, files in os.walk(dataset_path):
         index = 0
         counter += 1
-        
+        print(files)
         while index < len(files) - 1:
             sample = random.random()
             if sample <= test_split:
@@ -50,6 +65,20 @@ def load_pairs(dataset_path, validation_split, test_split):
             index += 2
 
     return train_pairs, validation_pairs, test_pairs
+
+def load_pairs_from_folds(dataset_path, allow_images):
+    allow_images = set(allow_images)
+    print(f'[log]: Loading triplets from {dataset_path}')
+    pairs = []
+    for root, _, files in os.walk(dataset_path):
+        index = 0
+        while index < len(files) - 1:
+            if files[index] in allow_images and files[index + 1] in allow_images:
+                pairs.append(
+                    {'id': len(pairs), 'root': root, 'parent': files[index], 'child': files[index + 1]})
+            index += 2
+
+    return pairs
 
 def generate_priplets(pairs):
     print(f'[log]: generating triples...')
@@ -84,9 +113,6 @@ def generate_csv_file(dataset_path, csv_path):
     df.to_csv(csv_path, index=False)
     print('[log]: Done')
 
-def split_data(folders, validation_split, test_split):
-    pass
-
 def generate_csv_file(dataset_path, csv_path, validation_split, test_split):
     print(f'[log]: generating csv file from {dataset_path}')
     train_pairs, validation_pairs, test_pairs = load_pairs(dataset_path, validation_split, test_split)
@@ -105,7 +131,21 @@ def generate_csv_file(dataset_path, csv_path, validation_split, test_split):
 
     print('[log]: Done')
 
+def generate_csv_file_from_folds(dataset_path, folds_path, csv_path, folds):
+    print(f'[log]: generating csv file from {dataset_path}')
+    allow_images = read_folds(folds_path, folds)
+    pairs = load_pairs_from_folds(dataset_path, allow_images)
+
+    triplets = generate_priplets(pairs)
+    df = pd.DataFrame.from_dict(triplets)
+    df.to_csv(csv_path, index=False)
+
+    print('[log]: Done')
+
 
 if __name__ == '__main__':
-    generate_csv_file(BASE_PATH + KinFaceWI, 'KinFaceWITriplets.csv', .2, .2)
-    generate_csv_file(BASE_PATH + KinFaceWII, 'KinFaceWIITriplets.csv', .2, .2)
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITrainFolds.csv', [1, 2, 3])
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITestFolds.csv', [4])
+
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITrainFolds.csv', [1, 2, 3])
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITestFolds.csv', [4])
