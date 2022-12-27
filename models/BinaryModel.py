@@ -17,4 +17,19 @@ class Classifier(nn.Module):
         joint_embedding = torch.cat([first_embedding, second_embedding], dim=1)
         # print(joint_embedding.shape)
         return self.classifier(joint_embedding)
+
+class BinaryClassifier(nn.Module):
+
+    def __init__(self, embedding_size=64):
+        super().__init__()
+
+        self.fc1 = nn.Linear(embedding_size * 2, 128)
+        self.fc2 = nn.Linear(128, 1)
+
+    def forward(self, e1, e2):
+        x = torch.concat((e1, e1), dim=1)
+        x = F.relu(self.fc1(x))
+        x = torch.sigmoid(self.fc2(x))
+
+        return x
         

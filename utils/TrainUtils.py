@@ -18,27 +18,35 @@ TrainKINFaceWII = 'data\\KinFaceWIITrainFolds.csv'
 ValidationKINFaceWI = 'data\\KinFaceWITestFolds.csv'
 ValidationKINFaceWII = 'data\\KinFaceWIITestFolds.csv'
 
-TestKINFaceWI = 'data\\TestKinFaceWITriplets.csv'
-TestKINFaceWII = 'data\\TestKinFaceWIITriplets.csv'
-
 # logging.basicConfig(filename=f'{int(time.time() * 1000)}.log', level=logging.DEBUG)
+
+def euclidean_distances(vec1, vec2):
+    vec1 = vec1 / torch.norm(vec1)
+    vec2 = vec2 / torch.norm(vec2)
+
+    distance = torch.pow(torch.norm(vec1 - vec2, dim=1), 2)
+    return distance
 
 def create_loss_function(model, alpha, l2_alpha):
     sim = torch.nn.CosineSimilarity()
+    # dis = euclidean_distances
     def triplet_loss(anchor, pos, neg):
         count, _ = anchor.shape
 
         anchor_pos_diff = 1 - sim(anchor, pos)
         anchor_neg_diff = 1 - sim(anchor, neg)
+        # anchor_pos_diff = dis(anchor, pos)
+        # anchor_neg_diff = dis(anchor, neg)
         
         loss_val = anchor_pos_diff - anchor_neg_diff + alpha
         loss_val = torch.fmax(loss_val, torch.zeros_like(loss_val))
         loss_val = torch.sum(loss_val)
 
         with torch.no_grad():
-            threshold = anchor_pos_diff.mean()
+            threshold = anchor_pos_diff.mean() + anchor_pos_diff.std() 
             pos_count = torch.sum(anchor_pos_diff <= threshold)
             neg_count = torch.sum(anchor_neg_diff > threshold)
+
             accuracy = (pos_count + neg_count) / (count * 2)
         
         return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean(), anchor_pos_diff.std(), anchor_neg_diff.std()
@@ -46,12 +54,16 @@ def create_loss_function(model, alpha, l2_alpha):
 
 def create_mixed_loss(model, alpha):
     sim = torch.nn.CosineSimilarity()
+    # dis = euclidean_distances
     def triplet_loss(true_anchor, true_pos, true_neg, false_anchor, false_pos):
         count, _ = true_anchor.shape
 
         tanchor_tpos_diff = 1 - sim(true_anchor, true_pos)
         tanchor_tneg_diff = 1 - sim(true_anchor, true_neg)
         fanchor_fpos_diff = 1 - sim(false_anchor, false_pos)
+        # tanchor_tpos_diff = dis(true_anchor, true_pos)
+        # tanchor_tneg_diff = dis(true_anchor, true_neg)
+        # fanchor_fpos_diff = dis(false_anchor, false_pos)
 
         first_term = tanchor_tpos_diff - tanchor_tneg_diff + alpha
         first_term = torch.fmax(first_term, torch.zeros_like(first_term))
@@ -284,21 +296,25 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, tr
     fig, ax = plt.subplots(1, 1)
     train_losses = []
     validation_losses = []
+    train_accuracy = []
+    val_accuracy = []
 
     for epoch in range(1, epochs+1):
-        total_loss_train, accuracy, anchor_pos_total_mean, anchor_neg_total_mean, anchor_pos_total_std, anchor_neg_total_std, train_losses_for_epoch = training_step(train_dataset, model, optimizer, loss_fn, device)
-        print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {accuracy.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
+        total_loss_train, train_accuracy_value, anchor_pos_total_mean, anchor_neg_total_mean, anchor_pos_total_std, anchor_neg_total_std, train_losses_for_epoch = training_step(train_dataset, model, optimizer, loss_fn, device)
+        print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {train_accuracy_value.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
 
-        total_loss_validation, accuracy, anchor_pos_total_mean, anchor_neg_toal_mean, anchor_pos_total_std, anchor_neg_total_std, validation_losses_for_epoch = validation_step(validation_dataset, model, optimizer, loss_fn, device)
-        print(f'validation loss: {total_loss_validation} accuracy: {accuracy * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
+        total_loss_validation, val_accuracy_value, anchor_pos_total_mean, anchor_neg_toal_mean, anchor_pos_total_std, anchor_neg_total_std, validation_losses_for_epoch = validation_step(validation_dataset, model, optimizer, loss_fn, device)
+        print(f'validation loss: {total_loss_validation} accuracy: {val_accuracy_value * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
 
         train_losses.extend(train_losses_for_epoch)
         validation_losses.extend(validation_losses_for_epoch)
+        train_accuracy.append(train_accuracy_value.item())
+        val_accuracy.append(val_accuracy_value.item())
             
-        # torch.save(model.state_dict(), f'model_{epoch}.pth')
+        torch.save(model.state_dict(), f'model_{epoch}.pth')
         
 
-    return train_losses, validation_losses
+    return train_losses, validation_losses, train_accuracy, val_accuracy
 
 def initiate_dataset(csv_path_1, csv_path_2, dataset_code):
     kinfacei = KinFaceDataset(csv_path=csv_path_1, transform=transforms.Compose([

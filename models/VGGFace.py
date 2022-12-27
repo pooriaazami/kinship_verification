@@ -18,7 +18,7 @@ class VGGFace(nn.Module):
     Main Class
     """
 
-    def __init__(self, trainable=True, freeze=True):
+    def __init__(self,freeze=True):
         """
         Constructor
         """
@@ -39,9 +39,8 @@ class VGGFace(nn.Module):
         self.conv_5_3 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
 
         if freeze:
-            if not trainable:
-                for param in self.parameters():
-                    param.requires_grad = False
+            for param in self.parameters():
+                param.requires_grad = False
 
     def forward(self, x):
         """ Pytorch forward
@@ -55,21 +54,24 @@ class VGGFace(nn.Module):
         x = F.relu(self.conv_1_1(x))
         x = F.relu(self.conv_1_2(x))
         x = F.max_pool2d(x, 2, 2)
+
         x = F.relu(self.conv_2_1(x))
         x = F.relu(self.conv_2_2(x))
         x = F.max_pool2d(x, 2, 2)
+
         x = F.relu(self.conv_3_1(x))
         x = F.relu(self.conv_3_2(x))
         x = F.relu(self.conv_3_3(x))
         x = F.max_pool2d(x, 2, 2)
+
         x = F.relu(self.conv_4_1(x))
         x = F.relu(self.conv_4_2(x))
         x = F.relu(self.conv_4_3(x))
         x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv_5_1(x))
-        x = F.relu(self.conv_5_2(x))
-        x = F.relu(self.conv_5_3(x))
-        x = F.max_pool2d(x, 2, 2)
+        # x = F.relu(self.conv_5_1(x))
+        # x = F.relu(self.conv_5_2(x))
+        # x = F.relu(self.conv_5_3(x))
+        # x = F.max_pool2d(x, 2, 2)
         return x  # (512, 2, 2)
 
 

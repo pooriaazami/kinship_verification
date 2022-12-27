@@ -1,7 +1,7 @@
 import torch
 import unittest
 
-from BaseCNN import BaseCNN
+from BaseCNN import BaseCNN, BinaryClassifier
 
 class BaseCNNTest(unittest.TestCase):
     
@@ -12,6 +12,7 @@ class BaseCNNTest(unittest.TestCase):
         test_output = model(sample_input)
 
         self.assertTrue(test_output.shape == (10, 128))
+
 
 if __name__ == '__main__':
     unittest.main()

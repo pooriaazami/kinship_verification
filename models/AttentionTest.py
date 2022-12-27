@@ -1,7 +1,7 @@
 import torch
 import unittest
 
-from Attention import ChannelAttention, SpatialAttention, AttentionLayer
+from Attention import ChannelAttention, SpatialAttention, AttentionLayer, SpatialAttn
 
 
 class AttentionTest(unittest.TestCase):
@@ -29,6 +29,14 @@ class AttentionTest(unittest.TestCase):
         test_output = attention_layer(sample_input)
 
         print('attention_layer: ', test_output.shape)
+
+    def test_spatial_attn(self):
+        attention_layer = SpatialAttn(in_features=3)
+
+        sample_input = torch.zeros((10, 3, 64, 64), dtype=torch.float32)
+        test_output = attention_layer(sample_input)
+
+        print('spatial_attn: ', test_output.shape)
 
 
 if __name__ == '__main__':
