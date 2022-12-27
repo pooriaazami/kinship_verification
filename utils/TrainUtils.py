@@ -95,7 +95,6 @@ def create_mixed_loss(model, alpha):
         return loss_val, accuracy, ap_mean, np_mean, ap_std, np_std
     return triplet_loss
 
-
 def training_step(train_dataset, model, optimizer, loss_fn, device):
     model.train()
     total_loss_train = .0
@@ -200,6 +199,98 @@ def augmented_training_step(train_dataset, model, optimizer, loss_fn, device):
     total_accuracy /= len(train_dataset)
 
     return total_loss_train, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, train_losses
+
+def train_binary_classifier(classifier_model, embedding_model, optimizer, criterion, training_data, validation_data, epochs, device='cpu'):
+    embedding_model.eval()
+    classifier_model.train()
+
+    train_acc = []
+    validation_acc = []
+
+    for epoch in range(epochs):
+        train_acc_temp = .0
+        train_loss_temp = .0
+
+        for batch in tqdm(training_data):
+            optimizer.zero_grad()
+
+            anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+
+            anchor = anchor.to(device)
+            pos = pos.to(device)
+            neg = neg.to(device)
+
+            batch_size, _, _, _ = anchor.shape
+
+            # with torch.no_grad():
+            anchor_embeddings = embedding_model(anchor)
+            pos_embeddings = embedding_model(pos)
+            neg_embeddings = embedding_model(neg)
+            
+            pos_predictions = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
+            neg_predictions = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
+            
+            # concatenated_predictions = torch.cat((pos_predictions, neg_predictions))
+            # true_labels = torch.cat([torch.ones(batch_size, 1), torch.zeros(batch_size, 1)]).to(device)
+            # print(concatenated_predictions)
+            # train_acc_temp = .0
+            loss_term_1 = criterion(pos_predictions, torch.ones_like(pos_predictions))
+            loss_term_2 = criterion(neg_predictions, torch.zeros_like(neg_predictions))
+            loss = loss_term_1 + loss_term_2
+
+            loss.backward()
+            optimizer.step()
+
+            with torch.no_grad():
+                posetives = torch.sum(pos_predictions > 0)
+                negatives = torch.sum(neg_predictions <= 0)
+                # print(anchor.shape, posetives.shape)
+                # print('\n', posetives.item(), negatives.item(), (posetives + negatives).item(), batch_size)
+                train_acc_temp += (posetives + negatives) / (batch_size * 2)
+                train_loss_temp += loss.item()
+                # print(concatenated_predictions)
+            
+
+            # train_acc_temp += loss.item()
+
+            
+
+        train_acc.append(train_acc_temp / len(training_data))
+        print(f'#Epoch {epoch + 1} Loss: {train_loss_temp},  Train accuracy: {train_acc[-1] * 100}')
+
+        classifier_model.eval()
+        with torch.no_grad():
+            validation_acc_temp = .0
+            validation_loss_temp = .0
+
+            for batch in tqdm(validation_data):
+                anchor_embeddings = embedding_model(anchor)
+                pos_embeddings = embedding_model(pos)
+                neg_embeddings = embedding_model(neg)
+
+                pos_predictions = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
+                neg_predictions = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
+                # print(anchor_embeddings.shape, pos_predictions.shape)
+                # concatenated_predictions = torch.concat((pos_predictions, neg_predictions))
+                # true_labels = torch.concat([torch.ones(batch_size, 1), torch.zeros(batch_size, 1)]).to(device)
+                # print(concatenated_predictions.shape, true_labels.shape)
+                # loss = criterion(concatenated_predictions, true_labels)
+                loss_term_1 = criterion(pos_predictions, torch.ones_like(pos_predictions))
+                loss_term_2 = criterion(neg_predictions, torch.zeros_like(neg_predictions))
+                loss = loss_term_1 + loss_term_2
+                # validation_loss_temp += loss.item()
+
+                posetives = torch.sum(pos_predictions > 0)
+                negatives = torch.sum(neg_predictions <= 0)
+                validation_acc_temp += (posetives + negatives) / (batch_size * 2)
+                validation_loss_temp += loss.item()
+
+            validation_acc.append(validation_acc_temp / len(validation_data))
+            print(f'validation accuracy: Loss {validation_loss_temp},  {validation_acc[-1] * 100}')
+            torch.save(classifier_model.state_dict(), f'classifier_model_{epoch + 1}.pth')
+
+    return train_acc, validation_acc
+
 
 def validate_augmented_model(validation_dataset, model, optimizer, loss_fn, device):
     model.eval()
@@ -311,7 +402,7 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, tr
         train_accuracy.append(train_accuracy_value.item())
         val_accuracy.append(val_accuracy_value.item())
             
-        torch.save(model.state_dict(), f'model_{epoch}.pth')
+        torch.save(model.state_dict(), f'embedding_model_{epoch}.pth')
         
 
     return train_losses, validation_losses, train_accuracy, val_accuracy

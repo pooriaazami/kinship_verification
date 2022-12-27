@@ -23,13 +23,14 @@ class BinaryClassifier(nn.Module):
     def __init__(self, embedding_size=64):
         super().__init__()
 
-        self.fc1 = nn.Linear(embedding_size * 2, 128)
-        self.fc2 = nn.Linear(128, 1)
+        self.fc1 = nn.Linear(embedding_size * 2, 64)
+        # self.fc2 = nn.Linear(128, 128)
+        self.fc2 = nn.Linear(64 , 1)
+        # self.sigmoid = nn.Sigmoid()
 
-    def forward(self, e1, e2):
-        x = torch.concat((e1, e1), dim=1)
+    def forward(self, x):
+        # x = torch.cat((e1, e1), dim=1)
         x = F.relu(self.fc1(x))
-        x = torch.sigmoid(self.fc2(x))
-
-        return x
+        # x = F.relu(self.fc2(x))
+        return self.fc2(x)
         
