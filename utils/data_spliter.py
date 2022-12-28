@@ -144,8 +144,8 @@ def generate_csv_file_from_folds(dataset_path, folds_path, csv_path, folds):
 
 
 if __name__ == '__main__':
-    generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITrainFolds.csv', [1, 2, 3, 4])
-    generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITestFolds.csv', [5])
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITrainFolds.csv', [2, 3, 4, 5])
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITestFolds.csv', [1])
 
-    generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITrainFolds.csv', [1, 2, 3, 4])
-    generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITestFolds.csv', [5])
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITrainFolds.csv', [2, 3, 4, 5])
+    generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITestFolds.csv', [1])

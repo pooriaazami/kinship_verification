@@ -256,7 +256,7 @@ def train_binary_classifier(classifier_model, embedding_model, optimizer, criter
             
 
         train_acc.append(train_acc_temp / len(training_data))
-        print(f'#Epoch {epoch + 1} Loss: {train_loss_temp},  Train accuracy: {train_acc[-1] * 100}')
+        print(f'#Epoch {epoch + 1}  Loss: {train_loss_temp}, Train accuracy: {train_acc[-1] * 100}')
 
         classifier_model.eval()
         with torch.no_grad():
@@ -286,11 +286,10 @@ def train_binary_classifier(classifier_model, embedding_model, optimizer, criter
                 validation_loss_temp += loss.item()
 
             validation_acc.append(validation_acc_temp / len(validation_data))
-            print(f'validation accuracy: Loss {validation_loss_temp},  {validation_acc[-1] * 100}')
+            print(f'validation accuracy: {validation_acc[-1] * 100}, Loss {validation_loss_temp}')
             torch.save(classifier_model.state_dict(), f'classifier_model_{epoch + 1}.pth')
 
     return train_acc, validation_acc
-
 
 def validate_augmented_model(validation_dataset, model, optimizer, loss_fn, device):
     model.eval()
@@ -339,7 +338,6 @@ def validate_augmented_model(validation_dataset, model, optimizer, loss_fn, devi
 
         return total_loss_validation, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, validation_losses
 
-
 def validate_model(validation_dataset, model, optimizer, loss_fn, device):
     model.eval()
     with torch.no_grad():
@@ -381,7 +379,6 @@ def validate_model(validation_dataset, model, optimizer, loss_fn, device):
         total_accuracy /= len(validation_dataset)
 
         return total_loss_validation, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, validation_losses
-
 
 def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, training_step=training_step, validation_step=validate_model, epochs=10, device='cpu'):
     fig, ax = plt.subplots(1, 1)
@@ -443,3 +440,32 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validati
     validation_dataloader = DataLoader(validation_concatinated_data, batch_size=validation_batch_size, shuffle=True, num_workers=2, prefetch_factor=2)
 
     return train_dataloader, validation_dataloader
+
+def validate_model(embedding_model, classifier_model, dataset, device='cpu'):
+    embedding_model.eval()
+    classifier_model.eval()
+    
+    accuracy = .0
+    for batch in tqdm(dataset):
+        anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+
+        anchor = anchor.to(device)
+        pos = pos.to(device)
+        neg = neg.to(device)
+
+        anchor_embeddings = embedding_model(anchor)
+        pos_embeddings = embedding_model(pos)
+        neg_embeddings = embedding_model(neg)
+
+        posetives = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
+        negatives = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
+
+        posetives_count = torch.sum(posetives > 0)
+        negatives_count = torch.sum(negatives <= 0)
+
+        batch, _, _, _ = anchor.shape
+
+        accuracy += (posetives_count + negatives_count) / (batch * 2)
+    
+    accuracy /= len(dataset)
+    return accuracy
