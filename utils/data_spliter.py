@@ -48,7 +48,6 @@ def load_pairs(dataset_path, validation_split, test_split):
 
     counter = 0
     validation_split += test_split
-    # print(validation_split)
     for root, _, files in os.walk(dataset_path):
         index = 0
         counter += 1

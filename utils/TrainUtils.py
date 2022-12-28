@@ -67,7 +67,6 @@ def create_mixed_loss(model, alpha):
 
         first_term = tanchor_tpos_diff - tanchor_tneg_diff + alpha
         first_term = torch.fmax(first_term, torch.zeros_like(first_term))
-        # temp = first_term.cpu()
         first_term = torch.sum(first_term)
 
         second_term = tanchor_tpos_diff - fanchor_fpos_diff + alpha
@@ -83,9 +82,6 @@ def create_mixed_loss(model, alpha):
             fpos_count = torch.sum(fanchor_fpos_diff > threshold)
 
             accuracy = (tpos_count + tneg_count) / (count * 2)
-
-            # df = pd.DataFrame(temp.numpy())
-            # df.to_csv(f'logs\\{time.time() * 1000}.csv')
 
         ap_mean = tanchor_tpos_diff.mean()
         ap_std =  tanchor_tpos_diff.std()
@@ -163,7 +159,6 @@ def augmented_training_step(train_dataset, model, optimizer, loss_fn, device):
         pos_neg = torch.cat([torch.zeros((batch, 1, width, height), device=neg.device), neg], dim=1)
         neg_anchor = torch.cat([torch.ones((batch, 1, width, height), device=pos.device), pos], dim=1) 
         neg_neg = torch.cat([torch.zeros((batch, 1, width, height), device=anchor.device), anchor], dim=1)
-        # print(pos_anchor.shape) 
 
         pos_anchor = pos_anchor.to(device)
         pos_pos = pos_pos.to(device)
@@ -230,10 +225,6 @@ def train_binary_classifier(classifier_model, embedding_model, optimizer, criter
             pos_predictions = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
             neg_predictions = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
             
-            # concatenated_predictions = torch.cat((pos_predictions, neg_predictions))
-            # true_labels = torch.cat([torch.ones(batch_size, 1), torch.zeros(batch_size, 1)]).to(device)
-            # print(concatenated_predictions)
-            # train_acc_temp = .0
             loss_term_1 = criterion(pos_predictions, torch.ones_like(pos_predictions))
             loss_term_2 = criterion(neg_predictions, torch.zeros_like(neg_predictions))
             loss = loss_term_1 + loss_term_2
@@ -244,15 +235,8 @@ def train_binary_classifier(classifier_model, embedding_model, optimizer, criter
             with torch.no_grad():
                 posetives = torch.sum(pos_predictions > 0)
                 negatives = torch.sum(neg_predictions <= 0)
-                # print(anchor.shape, posetives.shape)
-                # print('\n', posetives.item(), negatives.item(), (posetives + negatives).item(), batch_size)
                 train_acc_temp += (posetives + negatives) / (batch_size * 2)
                 train_loss_temp += loss.item()
-                # print(concatenated_predictions)
-            
-
-            # train_acc_temp += loss.item()
-
             
 
         train_acc.append(train_acc_temp / len(training_data))
@@ -270,15 +254,10 @@ def train_binary_classifier(classifier_model, embedding_model, optimizer, criter
 
                 pos_predictions = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
                 neg_predictions = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
-                # print(anchor_embeddings.shape, pos_predictions.shape)
-                # concatenated_predictions = torch.concat((pos_predictions, neg_predictions))
-                # true_labels = torch.concat([torch.ones(batch_size, 1), torch.zeros(batch_size, 1)]).to(device)
-                # print(concatenated_predictions.shape, true_labels.shape)
-                # loss = criterion(concatenated_predictions, true_labels)
+
                 loss_term_1 = criterion(pos_predictions, torch.ones_like(pos_predictions))
                 loss_term_2 = criterion(neg_predictions, torch.zeros_like(neg_predictions))
                 loss = loss_term_1 + loss_term_2
-                # validation_loss_temp += loss.item()
 
                 posetives = torch.sum(pos_predictions > 0)
                 negatives = torch.sum(neg_predictions <= 0)
@@ -444,7 +423,7 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=256, validati
 def validate_model(embedding_model, classifier_model, dataset, device='cpu'):
     embedding_model.eval()
     classifier_model.eval()
-    
+
     accuracy = .0
     for batch in tqdm(dataset):
         anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
