@@ -18,11 +18,16 @@ class BinaryClassifier(nn.Module):
 
     def __init__(self, embedding_size=64):
         super().__init__()
-
-        self.fc1 = nn.Linear(embedding_size * 2, 64)
-        self.fc2 = nn.Linear(64 , 1)
+        latent_dim = 32
+        self.fc1 = nn.Linear(embedding_size, latent_dim)
+        # self.fc2 = nn.Linear(latent_dim , latent_dim)
+        self.fc3 = nn.Linear(latent_dim , 1)
+        self.dropout = nn.Dropout(.5)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        return self.fc2(x)
+        x = self.dropout(x)
+        # x = F.relu(self.fc2(x))
+        # x = self.dropout(x)
+        return self.fc3(x)
         

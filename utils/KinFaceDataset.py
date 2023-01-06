@@ -14,21 +14,28 @@ class KinFaceDataset(Dataset):
         self.__triplets = pd.read_csv(csv_path)
         self.__transform = transform
 
+        self.__cache = {}
+
     def __len__(self):
         return len(self.__triplets)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        # print(idx)
-        items = self.__triplets.iloc[idx]
-        anchor_paths = items['parent']
-        posotive_paths = items['child']
-        negative_paths = items['negative_child']
 
-        anchor_images = io.imread(anchor_paths)
-        positive_images = io.imread(posotive_paths)
-        negative_images = io.imread(negative_paths)
+        items = self.__triplets.iloc[idx]
+        if items['parent'] not in self.__cache.keys():
+            self.__cache[items['parent']] = io.imread(items['parent'])
+        
+        if items['child'] not in self.__cache.keys():
+            self.__cache[items['child']] = io.imread(items['child'])
+
+        if items['negative_child'] not in self.__cache.keys():
+            self.__cache[items['negative_child']] = io.imread(items['negative_child'])
+
+        anchor_images = self.__cache[items['parent']]
+        positive_images = self.__cache[items['child']]
+        negative_images = self.__cache[items['negative_child']]
 
         sample = {'anchor': anchor_images,
                   'pos': positive_images,
@@ -41,6 +48,42 @@ class KinFaceDataset(Dataset):
             sample = self.__transform(sample)
 
         return sample
+
+# class KinFaceWII(Dataset):
+#     def __init__(self, path,transform=None):
+#         self.__base_path = path
+
+#     def __len__(self):
+#         return 500 * 4
+
+#     def __generate_path(self, idx):
+#         if idx < 500:
+#             path = f'{self.__base_path}\\father-dau\\fd_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
+#             label = 'father-dau'
+#         elif 500 <= idx < 1000:
+#             idx -= 500
+#             path = f'{self.__base_path}\\father-son\\fs_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
+#             label = 'father-son'
+#         elif 1000 <= idx < 1500:
+#             idx -= 1000
+#             path = f'{self.__base_path}\\mother-dau\\md_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
+#             label = 'mother-dau'
+#         elif 1500 <= idx < 2000:
+#             idx -= 1500
+#             path = f'{self.__base_path}\\mother-son\\ms_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
+#             label = 'mother-son'
+#         else:
+#             path = None
+
+#         return path, label
+    
+#     def __getitem__(self, idx):
+#         path, label = self.__generate_path(idx)
+#         img = io.imread(path)
+
+#         if self.__transform:
+#             sample = self.__transform(sample)
+
 
 class ToTensor:
     def __call__(self, sample):
@@ -74,3 +117,26 @@ class Normalize:
             'pos': pos,
             'neg': neg
         }
+
+
+class Augment:
+    def __init__(self):
+        self.transform = torch.nn.Sequential(
+             transforms.RandomRotation(30),
+             transforms.RandomHorizontalFlip(),
+             transforms.RandomVerticalFlip()
+        )
+
+    def __call__(self, sample):
+        anchor, pos, neg = sample['anchor'], sample['pos'], sample['neg']
+
+        anchor = self.transform(anchor)
+        pos = self.transform(pos)
+        neg = self.transform(neg)
+
+        return {
+            'anchor': anchor,
+            'pos': pos,
+            'neg': neg
+        }
+

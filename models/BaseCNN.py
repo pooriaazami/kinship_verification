@@ -5,6 +5,17 @@ import torch.nn.functional as F
 
 from models.Attention import AttentionLayer, SpatialAttn
 
+# def deactivate_ema(layer):
+#     layer.track_running_stats = False
+#     layer._saved_running_mean, layer.running_mean = layer.running_mean, None
+#     layer._saved_running_var, layer.running_var = layer.running_var, None
+
+# def activate_ema(layer):
+#     layer.track_running_stats = True
+#     layer.running_mean = layer._saved_running_mean
+#     layer.running_var = layer._saved_running_var
+
+
 class BaseCNN(nn.Module):
     def __init__(self, embedding_size=64, in_channels=3):
         super().__init__()
@@ -53,13 +64,13 @@ class BaseCNN(nn.Module):
         x = self.small_pool(x)
         # a    = self.middle_attention(x)
         # x = a + x
-        # x = self.batch_norm_1(x)
+        x = self.batch_norm_1(x)
        
         x = F.relu(self.conv2_1(x))
         # x = F.relu(self.conv2_2(x))
         # x = x + y
         x = self.small_pool(x)
-        # x = self.batch_norm_2(x)
+        x = self.batch_norm_2(x)
         
         x = F.relu(self.conv3_1(x))
         # x = F.relu(self.conv3_2(x))
@@ -87,6 +98,7 @@ class BaseCNN(nn.Module):
 
         # x = torch.flatten(x, 1)
         x = self.average_pool(x)
+        # print(x.shape)
         x = x.view(-1, 256)
         # print(x.shape)
         # x = self.dropout(x)
@@ -94,5 +106,18 @@ class BaseCNN(nn.Module):
         # print(a.shape)
         # x = a + x
         x = self.fc2(x)
+
+        # deactivate_ema(self.batch_norm_1)
+        # deactivate_ema(self.batch_norm_2)
+        # deactivate_ema(self.batch_norm_3)
+        # deactivate_ema(self.batch_norm_4)
         
         return x
+
+    # def activate_bn_ema(self):
+    #     # print('Start')
+    #     activate_ema(self.batch_norm_1)
+    #     activate_ema(self.batch_norm_2)
+    #     activate_ema(self.batch_norm_3)
+    #     activate_ema(self.batch_norm_4)
+        # print('Done')

@@ -39,10 +39,16 @@ class SiameseNet(nn.Module):
             # print(learnable_attention.shape)
             # print(mask_attention.shape)
             x = self.attention_mask(learnable_attention + mask_attention)
+            x = F.relu(x)
 
         x = self.base_cnn(x)
 
         return x
+    
+    # def eval(self):
+    #     super().eval()
+
+    #     self.base_cnn.activate_bn_ema()
 
 class PretrainedSiameseNet(nn.Module):
     def __init__(self, embedding_size=64, device='cpu', use_attention=False, freeze=False):
