@@ -97,3 +97,24 @@ class PretrainedSiameseNet(nn.Module):
         x = self.fc2(x)
 
         return x
+
+
+class MobileNet(nn.Module):
+    def __init__(self, embedding_size=64):
+        super().__init__()
+        self.base_model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v2', weights='MobileNet_V2_Weights.DEFAULT')
+
+        self.dropout = nn.Dropout(.5)
+        self.fc1 = nn.Linear(1000, embedding_size)
+
+        self.base_model.requires_grad = False
+
+    def forward(self, x):
+        x = self.base_model(x)
+        # print(x.sh)
+        x = torch.flatten(x, 1)
+        # print(x.shape)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        return x
+        

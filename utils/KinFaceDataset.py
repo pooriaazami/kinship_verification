@@ -140,3 +140,22 @@ class Augment:
             'neg': neg
         }
 
+class Resize:
+    def __init__(self):
+        self.transform = torch.nn.Sequential(
+             transforms.Resize(256),
+             transforms.CenterCrop(224)
+        )
+
+    def __call__(self, sample):
+        anchor, pos, neg = sample['anchor'], sample['pos'], sample['neg']
+
+        anchor = self.transform(anchor)
+        pos = self.transform(pos)
+        neg = self.transform(neg)
+
+        return {
+            'anchor': anchor,
+            'pos': pos,
+            'neg': neg
+        }

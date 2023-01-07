@@ -5,7 +5,7 @@ import torch.nn as nn
 from utils.TrainUtils import create_loss_function, train_model, load_dataset, augmented_training_step, \
                      create_mixed_loss, validate_augmented_model, train_binary_classifier, validate_model, \
                       generate_embeddings, load_splited_dataset
-from models.SiameseNet import PretrainedSiameseNet, SiameseNet
+from models.SiameseNet import PretrainedSiameseNet, SiameseNet, MobileNet
 from models.BinaryModel import BinaryClassifier
 
 import numpy as np
@@ -16,18 +16,19 @@ import pandas as pd
 def main():
     print('Initializing variables...')
     
-    train_dataloader, validation_dataloader = load_dataset(dataset_code='kfi', data_portion=2000, val_portion=100)
+    train_dataloader, validation_dataloader = load_dataset(dataset_code='kfii')#, data_portion=2000, val_portion=100)
     # embedding_dataloader, classification_dataloader, validation_dataloader = load_splited_dataset(dataset_code='kfi')#, data_portion=2000, val_portion=100)
     # model = SiameseNet(device='cuda', use_attention=True, in_channels=3, embedding_size=128).to('cuda')
-    model = PretrainedSiameseNet(device='cuda', use_attention=True, embedding_size=128).to('cuda')
+    # model = PretrainedSiameseNet(device='cuda', use_attention=True, embedding_size=128, freeze=True).to('cuda')
+    model = MobileNet(embedding_size=128).to('cuda')
 
     criterion = create_loss_function(model, .1, 0.01)
     # criterion = create_mixed_loss(model, 1.)
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-3)
 
     print('Done')
-    # model.load_state_dict(torch.load('.\\embedding_model_5.pth'))
-    train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=10)
+    model.load_state_dict(torch.load('.\\embedding_model_4.pth'))
+    # train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=10)
     # train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, training_step=augmented_training_step, validation_step=validate_augmented_model , device='cuda', epochs=500)
     print('Train Part I compleated')
 
@@ -47,15 +48,16 @@ def main():
     # plt.show()
 
 def test_models():
-    embedding_model = SiameseNet(device='cuda', use_attention=True, in_channels=3, embedding_size=64).to('cuda')
-    classifier_model = BinaryClassifier().to('cuda')
+    # embedding_model = SiameseNet(device='cuda', use_attention=True, in_channels=3, embedding_size=64).to('cuda')
+    # classifier_model = BinaryClassifier().to('cuda')
+    embedding_model = MobileNet(embedding_size=128).to('cuda')
 
-    embedding_model.load_state_dict(torch.load('.\\embedding_model_1.pth'))
-    classifier_model.load_state_dict(torch.load('.\\classifier_model_1.pth'))
+    embedding_model.load_state_dict(torch.load('.\\embedding_model_4.pth'))
+    # classifier_model.load_state_dict(torch.load('.\\classifier_model_1.pth'))
 
     train_dataloader, validation_dataloader = load_dataset(dataset_code='kfi')#, data_portion=20000, val_portion=100)
 
-    accuracy = validate_model(embedding_model, classifier_model, train_dataloader, 'cuda')
+    accuracy = validate_model(embedding_model, None, validation_dataloader, 'cuda')
     print(f'final accuracy: {accuracy * 100}')
     # embeddings = generate_embeddings(embedding_model, train_dataloader, 'cuda')
     # embeddings = np.array(embeddings)
@@ -74,5 +76,5 @@ def test_models():
 
 
 if __name__ == '__main__':
-    main()
-    # test_models()
+    # main()
+    test_models()

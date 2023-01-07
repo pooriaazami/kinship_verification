@@ -12,7 +12,7 @@ import random
 
 # import pandas as pd
 
-from utils.KinFaceDataset import KinFaceDataset, ToTensor, Normalize, Augment
+from utils.KinFaceDataset import KinFaceDataset, ToTensor, Normalize, Augment, Resize
 
 TrainKINFaceWI = 'data\\KinFaceWITrainFolds.csv'
 TrainKINFaceWII = 'data\\KinFaceWIITrainFolds.csv'
@@ -31,12 +31,12 @@ def euclidean_distances(vec1, vec2):
 
 def create_loss_function(model, alpha, l2_alpha):
     sim = torch.nn.CosineSimilarity()
-    dis = euclidean_distances
+    # dis = euclidean_distances
     def triplet_loss(anchor, pos, neg):
         count, _ = anchor.shape
 
-        anchor_pos_diff = 1 * (1 - sim(anchor, pos)) + .0 * dis(anchor, pos)
-        anchor_neg_diff = 1 * (1 - sim(anchor, neg)) + .0 * dis(anchor, neg)
+        anchor_pos_diff = 1 - sim(anchor, pos)
+        anchor_neg_diff = 1 - sim(anchor, neg)
         # anchor_pos_diff = dis(anchor, pos)
         # anchor_neg_diff = dis(anchor, neg)
         
@@ -399,18 +399,33 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, tr
 
     return train_losses, validation_losses, train_accuracy, val_accuracy
 
-def initiate_dataset(csv_path_1, csv_path_2, dataset_code, transform=True):
+def initiate_dataset(csv_path_1, csv_path_2, dataset_code, transform=True, model='base'):
     if transform:
-        transformations = transforms.Compose([
-            ToTensor(),
-            Normalize(),
-            Augment()
-        ])
+        if model == 'base':
+            transformations = transforms.Compose([
+                ToTensor(),
+                Normalize(),
+                Augment()
+            ])
+        elif model == 'mobilenet':
+            transformations = transforms.Compose([
+                Resize(),
+                ToTensor(),
+                Normalize(),
+                Augment()
+            ])
     else:
-        transformations = transformations = transforms.Compose([
-            ToTensor(),
-            Normalize(),
-        ])
+        if model == 'base':
+            transformations = transformations = transforms.Compose([
+                ToTensor(),
+                Normalize(),
+            ])
+        elif model == 'mobilenet':
+            transformations = transformations = transforms.Compose([
+                Resize(),
+                ToTensor(),
+                Normalize(),
+            ])
 
     kinfacei = KinFaceDataset(csv_path=csv_path_1, transform=transformations)
     kinfaceii = KinFaceDataset(csv_path=csv_path_2, transform=transformations)
@@ -468,8 +483,10 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=128, validati
     return train_dataloader, validation_dataloader
 
 def validate_model(embedding_model, classifier_model, dataset, device='cpu'):
+    sim = torch.nn.CosineSimilarity()
     embedding_model.eval()
-    classifier_model.eval()
+    if classifier_model is not None:
+        classifier_model.eval()
     
     accuracy = .0
     for batch in tqdm(dataset):
@@ -483,16 +500,30 @@ def validate_model(embedding_model, classifier_model, dataset, device='cpu'):
         pos_embeddings = embedding_model(pos)
         neg_embeddings = embedding_model(neg)
 
-        posetives = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
-        negatives = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
-        # print(posetives)
-        # print(negatives)
-        posetives_count = torch.sum(posetives > 0)
-        negatives_count = torch.sum(negatives <= 0)
+        if classifier_model is not None:
+            posetives = classifier_model(torch.cat((anchor_embeddings, pos_embeddings), dim=1))
+            negatives = classifier_model(torch.cat((anchor_embeddings, neg_embeddings), dim=1))
+            # print(posetives)
+            # print(negatives)
+            posetives_count = torch.sum(posetives > 0)
+            negatives_count = torch.sum(negatives <= 0)
 
-        batch, _, _, _ = anchor.shape
+            batch, _, _, _ = anchor.shape
 
-        accuracy += (posetives_count + negatives_count) / (batch * 2)
+            accuracy += (posetives_count + negatives_count) / (batch * 2)
+        else:
+            count, _, _, _ = anchor.shape
+            anchor_pos_diff = 1 - sim(anchor_embeddings, pos_embeddings)
+            anchor_neg_diff = 1 - sim(anchor_embeddings, neg_embeddings)
+
+            threshold = anchor_pos_diff.mean() + anchor_pos_diff.std() 
+            pos_count = torch.sum(anchor_pos_diff <= threshold)
+            neg_count = torch.sum(anchor_neg_diff > threshold)
+
+            accuracy += (pos_count + neg_count) / (count * 2)
+            # print((pos_count + neg_count) / (count * 2))
+            # print(acuuracy)
+            
     
     accuracy /= len(dataset)
     return accuracy
