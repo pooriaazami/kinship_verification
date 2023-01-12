@@ -16,9 +16,8 @@ class Classifier(nn.Module):
 
 class BinaryClassifier(nn.Module):
 
-    def __init__(self, embedding_size=64):
+    def __init__(self, embedding_size=64, latent_dim=32):
         super().__init__()
-        latent_dim = 32
         self.fc1 = nn.Linear(embedding_size, latent_dim)
         # self.fc2 = nn.Linear(latent_dim , latent_dim)
         self.fc3 = nn.Linear(latent_dim , 1)

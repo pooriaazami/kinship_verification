@@ -47,8 +47,8 @@ class BaseCNN(nn.Module):
         self.average_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         # self.fc1 = nn.Linear(8192, self.embedding_size)
-        # self.fc1 = nn.Linear(4096, self.embedding_size)
-        self.fc2 = nn.Linear(256, self.embedding_size)
+        self.fc2 = nn.Linear(4096, self.embedding_size)
+        # self.fc2 = nn.Linear(256, self.embedding_size)
         self.dropout = nn.Dropout(.5)
         # self.post_attention = nn.MultiheadAttention(256, 4, dropout=.3)
         # self.middle_attention = SpatialAttn(32)
@@ -96,10 +96,10 @@ class BaseCNN(nn.Module):
         
         
 
-        # x = torch.flatten(x, 1)
-        x = self.average_pool(x)
+        x = torch.flatten(x, 1)
+        # x = self.average_pool(x)
         # print(x.shape)
-        x = x.view(-1, 256)
+        # x = x.view(-1, 256)
         # print(x.shape)
         # x = self.dropout(x)
         # a, _ = self.post_attention(x, x, x)

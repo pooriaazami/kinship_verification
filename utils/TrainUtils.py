@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms, utils
 
@@ -52,6 +53,38 @@ def create_loss_function(model, alpha, l2_alpha):
             accuracy = (pos_count + neg_count) / (count * 2)
         
         return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean(), anchor_pos_diff.std(), anchor_neg_diff.std()
+    return triplet_loss
+
+def create_mixed_image_loss_function(model, alpha, l2_alpha):
+    # sim = torch.nn.CosineSimilarity()
+    # dis = euclidean_distances
+    loss_func = nn.BCEWithLogitsLoss()
+    def triplet_loss(anchor_pos, anchor_neg):
+        count, _ = anchor_pos.shape
+
+        # anchor_pos_diff = 1 - sim(anchor, pos)
+        # anchor_neg_diff = 1 - sim(anchor, neg)
+        # anchor_pos_diff = dis(anchor, pos)
+        # anchor_neg_diff = dis(anchor, neg)
+
+        # anchor_pos = torch.sum(anchor_pos, dim=1)
+        # anchor_neg = torch.sum(anchor_neg, dim=1)
+
+        # loss_val = anchor_pos - anchor_neg + alpha
+        # loss_val = torch.fmax(loss_val, torch.zeros_like(loss_val))
+        # loss_val = torch.sum(loss_val)
+        loss_term_1 = loss_func(anchor_pos, torch.ones_like(anchor_pos))
+        loss_term_2 = loss_func(anchor_neg, torch.zeros_like(anchor_neg))
+        loss_val = loss_term_1 + loss_term_2
+
+        with torch.no_grad():
+            # threshold = anchor_pos.mean() + anchor_pos.std() 
+            pos_count = torch.sum(anchor_pos >= 0)
+            neg_count = torch.sum(anchor_neg < 0)
+
+            accuracy = (pos_count + neg_count) / (count * 2)
+        
+        return loss_val, accuracy, anchor_pos.mean(), anchor_neg.mean(), anchor_pos.std(), anchor_neg.std()
     return triplet_loss
 
 def create_mixed_loss(model, alpha):
@@ -285,6 +318,68 @@ def train_binary_classifier(classifier_model, embedding_model, optimizer, criter
 
     return train_acc, validation_acc
 
+def train_mixed_image_network(embedding_model, optimizer, criterion, training_data, validation_data, epochs, device='cpu'):
+    embedding_model.eval()
+
+    train_acc = []
+    validation_acc = []
+    
+    for epoch in range(epochs):
+        train_acc_temp = .0
+        train_loss_temp = .0
+        counter = 1e-10
+
+        for batch in tqdm(training_data):
+            optimizer.zero_grad()
+
+            anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+
+            anchor = anchor.to(device)
+            pos = pos.to(device)
+            neg = neg.to(device)
+
+            batch_size, _, _, _ = anchor.shape
+            anchor_pos_embeddings = embedding_model(torch.cat([anchor, pos], dim=1))
+            anchor_neg_embeddings = embedding_model(torch.cat([anchor, neg], dim=1))
+            
+            loss, accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std = criterion(anchor_pos_embeddings, anchor_neg_embeddings)
+            loss.backward()
+            optimizer.step()
+
+            train_acc_temp += accuracy
+            train_loss_temp += loss.item()
+            
+
+        train_acc.append(train_acc_temp / len(training_data))
+        print(f'#Epoch {epoch + 1}  Loss: {train_loss_temp}, Train accuracy: {train_acc[-1] * 100}')
+
+        with torch.no_grad():
+            validation_acc_temp = .0
+            validation_loss_temp = .0
+
+            for batch in tqdm(validation_data):
+                anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+
+                anchor = anchor.to(device)
+                pos = pos.to(device)
+                neg = neg.to(device)
+
+                batch_size, _, _, _ = anchor.shape
+
+                anchor_pos_embeddings = embedding_model(torch.cat([anchor, pos], dim=1))
+                anchor_neg_embeddings = embedding_model(torch.cat([anchor, neg], dim=1))
+                
+                loss, accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std = criterion(anchor_pos_embeddings, anchor_neg_embeddings)
+
+                validation_acc_temp += accuracy
+                validation_loss_temp += loss.item()
+
+            validation_acc.append(validation_acc_temp / len(validation_data))
+            print(f'Loss {validation_loss_temp}, validation accuracy: {validation_acc[-1] * 100}, ')
+            torch.save(embedding_model.state_dict(), f'embedding_model_{epoch + 1}.pth')
+
+    return train_acc, validation_acc
+
 def validate_augmented_model(validation_dataset, model, optimizer, loss_fn, device):
     model.eval()
     with torch.no_grad():
@@ -376,7 +471,7 @@ def validate_model(validation_dataset, model, optimizer, loss_fn, device):
         return total_loss_validation, total_accuracy, anchor_pos_mean, anchor_neg_mean, anchor_pos_std, anchor_neg_std, validation_losses
 
 def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, training_step=training_step, validation_step=validate_model, epochs=10, device='cpu'):
-    fig, ax = plt.subplots(1, 1)
+    # fig, ax = plt.subplots(1, 1)
     train_losses = []
     validation_losses = []
     train_accuracy = []
