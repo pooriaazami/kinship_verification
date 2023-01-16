@@ -1,7 +1,7 @@
 import torch
 import unittest
 
-from models.VGGFace import VGGFace
+from VGGFace import VGGFace
 
 class VGGFaceTest(unittest.TestCase):
     def test_model(self):

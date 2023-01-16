@@ -24,7 +24,7 @@ class AttentionTest(unittest.TestCase):
 
     def test_attention_layer(self):
         attention_layer = AttentionLayer(3)
-
+            
         sample_input = torch.zeros((10, 3, 64, 64), dtype=torch.float32)
         test_output = attention_layer(sample_input)
 

@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms, utils
 
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -32,26 +34,37 @@ def euclidean_distances(vec1, vec2):
 
 def create_loss_function(model, alpha, l2_alpha):
     sim = torch.nn.CosineSimilarity()
-    # dis = euclidean_distances
+    loss_func = nn.BCEWithLogitsLoss(reduction='none')
+    # loss_alpha = .2
+    dis = euclidean_distances
     def triplet_loss(anchor, pos, neg):
         count, _ = anchor.shape
-
+        # print(count)
         anchor_pos_diff = 1 - sim(anchor, pos)
         anchor_neg_diff = 1 - sim(anchor, neg)
         # anchor_pos_diff = dis(anchor, pos)
         # anchor_neg_diff = dis(anchor, neg)
+
+        # pos_class_mask = anchor_pos_diff - alpha # <= alpha
+        # neg_class_mask = anchor_neg_diff - alpha # > alpha
+        # pos_class_loss = loss_func(pos_class_mask, torch.ones_like(pos_class_mask))
+        # neg_class_loss = loss_func(neg_class_mask, torch.zeros_like(neg_class_mask))
         
-        loss_val = anchor_pos_diff - anchor_neg_diff + alpha
+        # print(pos_class_loss.item())
+        loss_val = anchor_pos_diff - anchor_neg_diff + alpha# + pos_class_loss + neg_class_loss
         loss_val = torch.fmax(loss_val, torch.zeros_like(loss_val))
-        loss_val = torch.sum(loss_val)
+        loss_val = torch.mean(loss_val) 
 
         with torch.no_grad():
             threshold = anchor_pos_diff.mean() + anchor_pos_diff.std() 
-            pos_count = torch.sum(anchor_pos_diff <= threshold)
-            neg_count = torch.sum(anchor_neg_diff > threshold)
+            pos_mask = anchor_pos_diff <= threshold
+            neg_mask = anchor_neg_diff > threshold
 
+            pos_count = torch.sum(pos_mask)
+            neg_count = torch.sum(neg_mask)
+            # print(pos_count, neg_count)
             accuracy = (pos_count + neg_count) / (count * 2)
-        
+            
         return loss_val, accuracy, anchor_pos_diff.mean(), anchor_neg_diff.mean(), anchor_pos_diff.std(), anchor_neg_diff.std()
     return triplet_loss
 
@@ -141,6 +154,7 @@ def training_step(train_dataset, model, optimizer, loss_fn, device):
         optimizer.zero_grad()
 
         anchor, pos, neg = batch['anchor'], batch['pos'], batch['neg']
+        # print(anchor.shape)
 
         anchor = anchor.to(device)
         pos = pos.to(device)
@@ -458,6 +472,7 @@ def validate_model(validation_dataset, model, optimizer, loss_fn, device):
             anchor_pos_total_std += anchor_pos_std
             anchor_neg_total_std += anchor_neg_std
             total_accuracy += accuracy
+            # print(total_accuracy, len(validation_dataset))
 
             validation_losses.append(total_loss_validation)
 
@@ -480,7 +495,7 @@ def train_model(train_dataset, validation_dataset, model, loss_fn, optimizer, tr
     for epoch in range(1, epochs+1):
         total_loss_train, train_accuracy_value, anchor_pos_total_mean, anchor_neg_total_mean, anchor_pos_total_std, anchor_neg_total_std, train_losses_for_epoch = training_step(train_dataset, model, optimizer, loss_fn, device)
         print(f'#Epoch {epoch} loss: {total_loss_train} accuracy: {train_accuracy_value.item() * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
-
+        
         total_loss_validation, val_accuracy_value, anchor_pos_total_mean, anchor_neg_toal_mean, anchor_pos_total_std, anchor_neg_total_std, validation_losses_for_epoch = validation_step(validation_dataset, model, optimizer, loss_fn, device)
         print(f'validation loss: {total_loss_validation} accuracy: {val_accuracy_value * 100}, (a,p).mean: {anchor_pos_total_mean}, (a,p).std: {anchor_pos_total_std}, (a,n).mean(): {anchor_neg_total_mean}, (a,n).std: {anchor_neg_total_std}')
 
@@ -500,14 +515,15 @@ def initiate_dataset(csv_path_1, csv_path_2, dataset_code, transform=True, model
             transformations = transforms.Compose([
                 ToTensor(),
                 Normalize(),
-                Augment()
+                # Augment()
             ])
-        elif model == 'mobilenet':
+        elif model == 'mobilenet' or model == 'vgg':
+            # print('Here')
             transformations = transforms.Compose([
-                Resize(),
                 ToTensor(),
+                Resize(),
                 Normalize(),
-                Augment()
+                # Augment()
             ])
     else:
         if model == 'base':
@@ -515,10 +531,11 @@ def initiate_dataset(csv_path_1, csv_path_2, dataset_code, transform=True, model
                 ToTensor(),
                 Normalize(),
             ])
-        elif model == 'mobilenet':
+        elif model == 'mobilenet' or model == 'vgg':
+            # print('Here')
             transformations = transformations = transforms.Compose([
-                Resize(),
                 ToTensor(),
+                Resize(),
                 Normalize(),
             ])
 
@@ -534,9 +551,9 @@ def initiate_dataset(csv_path_1, csv_path_2, dataset_code, transform=True, model
     else:
         return concatenated_dataset
 
-def load_splited_dataset(data_portion=-1, val_portion=-1, train_batch_size=128, validation_batch_size=128, test_batch_size=128, dataset_code='mix'): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
-    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII, dataset_code)
-    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII, dataset_code, False)
+def load_splited_dataset(data_portion=-1, val_portion=-1, train_batch_size=128, validation_batch_size=128, test_batch_size=128, dataset_code='mix', model='base'): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
+    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII, dataset_code, model)
+    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII, dataset_code, False, model)
 
     if data_portion != -1:
         idx = torch.randperm(len(train_concatinated_data))[:data_portion]
@@ -560,9 +577,9 @@ def load_splited_dataset(data_portion=-1, val_portion=-1, train_batch_size=128, 
 
     return embedding_dataloader, classification_dataloader, validation_dataloader
 
-def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=128, validation_batch_size=128, test_batch_size=128, dataset_code='mix'): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
-    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII, dataset_code)
-    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII, dataset_code)
+def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=16, validation_batch_size=16, test_batch_size=16, dataset_code='mix', model='base'): #=-1, validation_split=.05, train_batch_size=256, validation_batch_size=256):
+    train_concatinated_data = initiate_dataset(TrainKINFaceWI, TrainKINFaceWII, dataset_code, model=model)
+    validation_concatinated_data = initiate_dataset(ValidationKINFaceWI, ValidationKINFaceWII, dataset_code, model=model)
 
     if data_portion != -1:
         idx = torch.randperm(len(train_concatinated_data))[:data_portion]
@@ -580,6 +597,7 @@ def load_dataset(data_portion=-1, val_portion=-1, train_batch_size=128, validati
 def validate_model(embedding_model, classifier_model, dataset, device='cpu'):
     sim = torch.nn.CosineSimilarity()
     embedding_model.eval()
+
     if classifier_model is not None:
         classifier_model.eval()
     
@@ -622,6 +640,65 @@ def validate_model(embedding_model, classifier_model, dataset, device='cpu'):
     
     accuracy /= len(dataset)
     return accuracy
+
+def log_model(model, dataset, alpha, device='cpu'):
+    model.eval()
+    sim = torch.nn.CosineSimilarity()
+
+    anchor_pos_wrongs = {
+            'anchor': [],
+            'pos': []
+        }
+
+    anchor_neg_wrongs = {
+        'anchor': [],
+        'neg': []
+    }
+
+    accuracy = .0
+    for batch in tqdm(dataset):
+        anchor, pos, neg, metadata = batch['anchor'], batch['pos'], batch['neg'], batch['index']
+
+        anchor = anchor.to(device)
+        pos = pos.to(device)
+        neg = neg.to(device)
+
+        batch_size, _, _, _ = anchor.shape
+        # print(batch_size)
+        anchor_embeddings = model(anchor)
+        pos_embeddings = model(pos)
+        neg_embeddings = model(neg)
+
+        anchor_pos_diff = 1 - sim(anchor_embeddings, pos_embeddings)
+        anchor_neg_diff = 1 - sim(anchor_embeddings, neg_embeddings)
+
+        threshold = anchor_pos_diff.mean() + anchor_pos_diff.std() 
+        pos_mask = anchor_pos_diff <= threshold
+        neg_mask = anchor_neg_diff > threshold
+        pos_count = torch.sum(pos_mask)
+        neg_count = torch.sum(neg_mask)
+
+        accuracy += (pos_count + neg_count) / (batch_size * 2)
+        # print(pos_mask.shape)
+        # print(pos_mask)
+        # print(metadata['parent'])
+        # print(metadata['parent'].shape)
+        # print(pos_count, neg_count)
+        anchor_pos_wrongs['anchor'].extend(np.array(metadata['parent'])[~(pos_mask.cpu().numpy())])
+        anchor_pos_wrongs['pos'].extend(np.array(metadata['child'])[~(pos_mask.cpu().numpy())])
+        
+        anchor_neg_wrongs['anchor'].extend(np.array(metadata['parent'])[~(neg_mask.cpu().numpy())])
+        anchor_neg_wrongs['neg'].extend(np.array(metadata['negative_child'])[~(neg_mask.cpu().numpy())])
+
+    accuracy /= len(dataset)
+    
+    anchor_pos_df = pd.DataFrame.from_dict(anchor_pos_wrongs)
+    anchor_neg_df = pd.DataFrame.from_dict(anchor_neg_wrongs)
+
+    anchor_pos_df.to_csv('anchor_pos_df.csv')
+    anchor_neg_df.to_csv('anchor_neg_df.csv')
+
+    return accuracy, anchor_pos_wrongs, anchor_neg_wrongs      
 
 def generate_embeddings(embedding_model, dataset, device='cpu'):
     embedding_model.eval()

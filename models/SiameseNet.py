@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from models.BaseCNN import BaseCNN
 from models.Attention import AttentionLayer, SpatialAttn
 from models.VGGFace import VGGFace
+from models.VGG import VGGModel
 
 
 class SiameseNet(nn.Module):
@@ -57,46 +58,51 @@ class PretrainedSiameseNet(nn.Module):
         self.use_attention = use_attention
 
         if self.use_attention:
-            self.attention_layer = SpatialAttn(3)
-            self.attention_mask = nn.Conv2d(3, 3, 3, padding=(1, 1))
-            # self.post_attention = nn.MultiheadAttention(8192, 4, dropout=.3)
+            self.attention_layer = AttentionLayer(3)
 
-        self.vggface = VGGFace(freeze=freeze)
-        self.vggface.load_state_dict(torch.load('models\\pretrained\\VGGFace2.pt'))
+        self.vggface = VGGModel(False)
+        self.vggface.load_state_dict(torch.load('models\\pretrained\\pretrained_vgg16.pth'))
+        # print(self.vggface)
+        if freeze:
+            self.vggface.requires_grad = False
 
-        # self.fc1 = nn.Linear(8192, embedding_size)
-        self.fc2 = nn.Linear(8192, embedding_size)
+        self.fc1 = nn.Linear(4096, embedding_size)
+        # self.fc2 = nn.Linear(embedding_size, embedding_size)
 
         self.dropout = nn.Dropout(.2)
 
-        self.leaky_relu = nn.LeakyReLU()
-        # self.average_pool = nn.AdaptiveAvgPool2d((1, 1))
-        if self.use_attention:
-            self.mask = torch.zeros((64, 64), dtype=torch.float32).to(self.device)
-            self.mask[8:24,8:56] = 1
-            self.mask[24:32,24:40] = 1
-            self.mask[32:64,16:48] = 1
+        # self.leaky_relu = nn.LeakyReLU()
+        # if self.use_attention:
+        #     self.mask = torch.zeros((64, 64), dtype=torch.float32).to(self.device)
+        #     self.mask[8:24,8:56] = 1
+        #     self.mask[24:32,24:40] = 1
+        #     self.mask[32:64,16:48] = 1
 
 
     def forward(self, x):
         if self.use_attention:
-            learnable_attention = self.attention_layer(x)
-            mask_attention = x * self.mask
+            x = self.attention_layer(x)
+            # mask_attention = x * self.mask
 
-            x = self.attention_mask(learnable_attention + mask_attention)
+            # x = self.attention_mask(learnable_attention + mask_attention)
 
         x = self.vggface(x)
-
-        x = torch.flatten(x, 1)
+        x = F.relu(x)
+        # x = torch.flatten(x, 1)
+        # x = F.relu(self.fc1(x))
         # x = self.average_pool(x)
         # x = x.view(-1, 512)
         # x = F.relu(self.fc1(x))
-        x = self.dropout(x)
+        # x = self.dropout(x)
         # a, _ = self.post_attention(x, x, x)
         # x = a + x
-        x = self.fc2(x)
+        x = self.fc1(x)
 
         return x
+
+    def unfreeze(self):
+        self.vggface.requires_grad = True
+        # self.vggface.unfreeze()
 
 
 class MobileNet(nn.Module):

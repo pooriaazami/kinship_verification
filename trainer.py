@@ -5,7 +5,7 @@ import torch.nn as nn
 from utils.TrainUtils import create_loss_function, train_model, load_dataset, augmented_training_step, \
                      create_mixed_loss, validate_augmented_model, train_binary_classifier, validate_model, \
                       generate_embeddings, load_splited_dataset, create_mixed_image_loss_function, \
-                      train_mixed_image_network
+                      train_mixed_image_network, log_model
 from models.SiameseNet import PretrainedSiameseNet, SiameseNet, MobileNet, CombinedNetwork, MixedImageNetwork
 from models.BinaryModel import BinaryClassifier
 
@@ -16,25 +16,33 @@ import pandas as pd
 
 def main():
     print('Initializing variables...')
-    
-    train_dataloader, validation_dataloader = load_dataset(dataset_code='kfi')#, data_portion=2000, val_portion=100)
+    torch.cuda.empty_cache()
+    alpha = .2
+    train_dataloader, validation_dataloader = load_dataset(dataset_code='kfi', model='vgg', data_portion=2000, val_portion=100)
     # embedding_dataloader, classification_dataloader, validation_dataloader = load_splited_dataset(dataset_code='kfi')#, data_portion=2000, val_portion=100)
-    model = SiameseNet(device='cuda', use_attention=True, in_channels=3, embedding_size=128).to('cuda')
-    # model = PretrainedSiameseNet(device='cuda', use_attention=True, embedding_size=128, freeze=True).to('cuda')
+    # model = SiameseNet(device='cuda', use_attention=False, in_channels=4, embedding_size=64).to('cuda')
+    model = PretrainedSiameseNet(device='cuda', use_attention=False, embedding_size=64, freeze=True).to('cuda')
     # model = MobileNet(embedding_size=128, use_attention=False).to('cuda')
     # model = CombinedNetwork(embedding_size=64).to('cuda')
-    # model = MixedImageNetwork(device='cuda', use_attention=True, in_channels=3, embedding_size=128).to('cuda')
-
-    criterion = create_loss_function(model, .1, 0.01)
+    # model = MixedImageNetwork(device='cuda', use_attention=False, in_channels=6, embedding_size=128).to('cuda')
+    print(model)
+    criterion = create_loss_function(model, alpha, 0.01)
     # criterion = create_mixed_loss(model, 1.)
     # criterion = create_mixed_image_loss_function(model, .1, .01)
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
 
     print('Done')
-    # model.load_state_dict(torch.load('.\\final_model_kinfacewii.pth'))
-    train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=10)
+    # model.load_state_dict(torch.load('.\\final.pth'))
+    train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=5)
+    # model.unfreeze()
+    # train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, device='cuda', epochs=5)
     # train_loss, val_loss, train_acc, val_acc = train_model(train_dataloader, validation_dataloader, model, criterion, optimizer, training_step=augmented_training_step, validation_step=validate_augmented_model , device='cuda', epochs=500)
     # train_acc, val_acc = train_mixed_image_network(model, optimizer, criterion, train_dataloader, validation_dataloader, 50, 'cuda')
+    accuracy, pos_achor_log, neg_anchor_log = log_model(model, validation_dataloader, alpha, 'cuda')
+    print(accuracy)
+    # print(accuracy)
+    # print(pos_achor_log)
+    # print(neg_anchor_log)
     # print('Train Part I compleated')
 
     # classifier = BinaryClassifier(embedding_size=64, latent_dim=128).to('cuda')
@@ -75,7 +83,19 @@ def test_models():
     # pd.DataFrame.from_dict(embeddings['neg']).to_csv('train_neg_log.csv')
     # print('negs saved')
 
-    
+def print_dataset_details():
+    train_dataloader, validation_dataloader = load_dataset(dataset_code='kfi')#, data_portion=2000, val_portion=100)
+    for batch in train_dataloader:
+        anchor, pos, neg, idx = batch['anchor'], batch['pos'], batch['neg'], batch['index']
+        print('parent:')
+        print(*idx['parent'], sep='\n')
+
+        print('child: ')
+        print(*idx['child'], sep='\n')
+
+        print('negative_child: ')
+        print(*idx['negative_child'], sep='\n')
+        break
 
     
 
@@ -83,3 +103,4 @@ def test_models():
 if __name__ == '__main__':
     main()
     # test_models()
+    # print_dataset_details()

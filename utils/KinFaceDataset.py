@@ -39,7 +39,13 @@ class KinFaceDataset(Dataset):
 
         sample = {'anchor': anchor_images,
                   'pos': positive_images,
-                  'neg': negative_images}
+                  'neg': negative_images,
+                  'index': {
+                    'parent': items['parent'],
+                    'child': items['child'],
+                    'negative_child': items['negative_child']
+                     }
+                  }
 
         if self.__transform:
             # anchor_images = self.__transform(anchor_images)
@@ -48,42 +54,6 @@ class KinFaceDataset(Dataset):
             sample = self.__transform(sample)
 
         return sample
-
-# class KinFaceWII(Dataset):
-#     def __init__(self, path,transform=None):
-#         self.__base_path = path
-
-#     def __len__(self):
-#         return 500 * 4
-
-#     def __generate_path(self, idx):
-#         if idx < 500:
-#             path = f'{self.__base_path}\\father-dau\\fd_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
-#             label = 'father-dau'
-#         elif 500 <= idx < 1000:
-#             idx -= 500
-#             path = f'{self.__base_path}\\father-son\\fs_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
-#             label = 'father-son'
-#         elif 1000 <= idx < 1500:
-#             idx -= 1000
-#             path = f'{self.__base_path}\\mother-dau\\md_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
-#             label = 'mother-dau'
-#         elif 1500 <= idx < 2000:
-#             idx -= 1500
-#             path = f'{self.__base_path}\\mother-son\\ms_{str(idx).rjust(3, "0")}_{idx%2}.jpg'
-#             label = 'mother-son'
-#         else:
-#             path = None
-
-#         return path, label
-    
-#     def __getitem__(self, idx):
-#         path, label = self.__generate_path(idx)
-#         img = io.imread(path)
-
-#         if self.__transform:
-#             sample = self.__transform(sample)
-
 
 class ToTensor:
     def __call__(self, sample):
@@ -96,7 +66,8 @@ class ToTensor:
         return {
             'anchor': torch.from_numpy(anchor),
             'pos': torch.from_numpy(pos),
-            'neg': torch.from_numpy(neg)
+            'neg': torch.from_numpy(neg),
+            'index': sample['index']
         }
 
 class Normalize:
@@ -115,7 +86,8 @@ class Normalize:
         return {
             'anchor': anchor,
             'pos': pos,
-            'neg': neg
+            'neg': neg,
+            'index': sample['index']
         }
 
 
@@ -137,7 +109,8 @@ class Augment:
         return {
             'anchor': anchor,
             'pos': pos,
-            'neg': neg
+            'neg': neg,
+            'index': sample['index']
         }
 
 class Resize:
@@ -157,5 +130,6 @@ class Resize:
         return {
             'anchor': anchor,
             'pos': pos,
-            'neg': neg
+            'neg': neg,
+            'index': sample['index']
         }

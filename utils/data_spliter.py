@@ -101,18 +101,38 @@ def generate_priplets(pairs):
             'negative_child': second['root'] + '\\' + second['parent']
         })
 
-        triplets.append({
-            'id': len(triplets),
-            'parent': first['root'] + '\\' + first['parent'],
-            'child': first['root'] + '\\' +first['child'],
-            'negative_child': second['root'] + '\\' +  second['child']
-        })
+        # triplets.append({
+        #     'id': len(triplets),
+        #     'parent': first['root'] + '\\' + first['parent'],
+        #     'child': first['root'] + '\\' +first['child'],
+        #     'negative_child': second['root'] + '\\' +  second['child']
+        # })
+
+        # triplets.append({
+        #     'id': len(triplets),
+        #     'child': first['root'] + '\\' + first['parent'],
+        #     'parent': first['root'] + '\\' +first['child'],
+        #     'negative_child': second['root'] + '\\' +  second['child']
+        # })
+
+    return triplets
+
+def generate_balanced_priplets(pairs):
+    print(f'[log]: generating triples...')
+    triplets = []
+    # print(pairs)
+    for first in pairs:
+        second = random.choice(pairs)
+        while first['id'] == second['id']:
+            second = random.choice(pairs)
+        # if first['id'] == second['id']:
+        #     continue
 
         triplets.append({
             'id': len(triplets),
-            'child': first['root'] + '\\' + first['parent'],
-            'parent': first['root'] + '\\' +first['child'],
-            'negative_child': second['root'] + '\\' +  second['child']
+            'parent': first['root'] + '\\' + first['parent'],
+            'child': first['root'] + '\\' + first['child'],
+            'negative_child': second['root'] + '\\' + second['parent']
         })
 
     return triplets
@@ -155,6 +175,18 @@ def generate_csv_file_from_folds(dataset_path, folds_path, csv_path, folds):
 
     print('[log]: Done')
 
+def generate_balanced_csv_file_from_folds(dataset_path, folds_path, csv_path, folds):
+    print(f'[log]: generating csv file from {dataset_path}')
+    allow_images = read_folds(folds_path, folds)
+    pairs = load_pairs_from_folds(dataset_path, allow_images)
+
+    triplets = generate_balanced_priplets(pairs)
+    # print(triples)
+    df = pd.DataFrame.from_dict(triplets)
+    df.to_csv(csv_path, index=False)
+
+    print('[log]: Done')
+
 
 if __name__ == '__main__':
     generate_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITrainFolds.csv', [2, 3, 4, 5])
@@ -162,3 +194,8 @@ if __name__ == '__main__':
 
     generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITrainFolds.csv', [2, 3, 4, 5])
     generate_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITestFolds.csv', [1])
+    # generate_balanced_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITrainFolds.csv', [2, 3, 4, 5])
+    # generate_balanced_csv_file_from_folds(BASE_PATH + KinFaceWI,  'data\\KinFaceWIFolds.txt', 'KinFaceWITestFolds.csv', [1])
+
+    # generate_balanced_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITrainFolds.csv', [2, 3, 4, 5])
+    # generate_balanced_csv_file_from_folds(BASE_PATH + KinFaceWII,  'data\\KinFaceWIIFolds.txt', 'KinFaceWIITestFolds.csv', [1])
